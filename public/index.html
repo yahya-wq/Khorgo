@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khorgo — AI Development Agent</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="192x192" href="logo-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="logo-512.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="Manifest.json">
+  <meta name="theme-color" content="#0B0B0C">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Sprite d'icônes monochromes (remplace tous les émojis) -->
+  <svg class="icon-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5c-1.4 0-2.7-.3-3.9-.9L3 21l1.9-5.6A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 1 1 21 11.5z"/></symbol>
+    <symbol id="i-tool" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 1 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.1 2.1-2.8-.7-.7-2.8 2.1-2.1z"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/><path d="M2 20h20"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 2.3 18a1.8 1.8 0 0 0 1.5 2.7h16.4a1.8 1.8 0 0 0 1.5-2.7L13.7 3.9a1.8 1.8 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7.5 9.5 10.5 12l-3 2.5"/><path d="M12.5 15h4"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 2v3"/><path d="M15 2v3"/><path d="M9 19v3"/><path d="M15 19v3"/><path d="M2 9h3"/><path d="M2 15h3"/><path d="M19 9h3"/><path d="M19 15h3"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.5 12.5 20 3"/><path d="M17 6l2 2"/><path d="M14 9l2 2"/></symbol>
+    <symbol id="i-toggle" viewBox="0 0 24 24"><rect x="2" y="8" width="20" height="8" rx="4"/><circle cx="16" cy="12" r="2.6"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.4 2.3c-.9.4-1.4 1-1.4 2"/><path d="M12 17h.01"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12h15"/><path d="M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v6"/><path d="M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6"/><path d="M15 9l-6 6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 7.4-2"/></symbol>
+    <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 20V4"/><path d="M6 10l6-6 6 6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v6h6"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 4h13l3 3v13H4z"/><path d="M8 4v5h8V4"/><path d="M8 14h8v6H8z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+  </svg>
+
+  <div class="app-container">
+    <header class="header">
+      <div class="header-content">
+        <img src="logo.png" alt="" class="logo-icon">
+        <h1>Khorgo</h1>
+        <span class="badge">AI Development Agent</span>
+      </div>
+      <div class="header-actions">
+        <span class="connection-status">
+          <span class="status-dot"></span>
+          <span class="status-text">Connexion...</span>
+        </span>
+        <button id="btn-restart" class="btn-icon" title="Redémarrer l'agent"><svg class="icon"><use href="#i-refresh"/></svg></button>
+        <button id="btn-clear" class="btn-icon" title="Effacer le chat"><svg class="icon"><use href="#i-trash"/></svg></button>
+      </div>
+    </header>
+
+    <div class="main-layout">
+      <nav class="sidebar">
+        <button class="nav-btn active" data-panel="chat"><span class="nav-icon"><svg class="icon"><use href="#i-chat"/></svg></span><span class="nav-label">Chat</span></button>
+        <button class="nav-btn" data-panel="activity"><span class="nav-icon"><svg class="icon"><use href="#i-tool"/></svg></span><span class="nav-label">Activité</span><span class="nav-badge" id="activity-badge">0</span></button>
+        <button class="nav-btn" data-panel="status"><span class="nav-icon"><svg class="icon"><use href="#i-chart"/></svg></span><span class="nav-label">Statut</span></button>
+        <button class="nav-btn" data-panel="errors"><span class="nav-icon"><svg class="icon"><use href="#i-alert"/></svg></span><span class="nav-label">Erreurs</span><span class="nav-badge error" id="error-badge">0</span></button>
+        <button class="nav-btn" data-panel="editor"><span class="nav-icon"><svg class="icon"><use href="#i-terminal"/></svg></span><span class="nav-label">Éditeur</span></button>
+      </nav>
+
+      <main class="content-area">
+        <div id="panel-chat" class="panel active">
+          <div class="panel-header"><h2><svg class="icon"><use href="#i-chat"/></svg> Conversation avec l'IA</h2></div>
+          <div class="chat-messages" id="chat-messages"></div>
+        </div>
+        <div id="panel-activity" class="panel">
+          <div class="panel-header"><h2><svg class="icon"><use href="#i-tool"/></svg> Activité des outils</h2><button class="btn-clear-panel" data-clear="activity"><svg class="icon"><use href="#i-trash"/></svg> Effacer</button></div>
+          <div class="activity-list" id="activity-list"><div class="empty-state">Aucune activité.</div></div>
+        </div>
+        <div id="panel-status" class="panel">
+          <div class="panel-header"><h2><svg class="icon"><use href="#i-chart"/></svg> Statut de la session</h2></div>
+          <div class="status-grid">
+            <div class="status-card"><div class="status-label"><svg class="icon"><use href="#i-folder"/></svg> Workspace</div><div class="status-value" id="status-workspace">-</div></div>
+            <div class="status-card"><div class="status-label"><svg class="icon"><use href="#i-plug"/></svg> Provider</div><div class="status-value" id="status-provider">-</div></div>
+            <div class="status-card"><div class="status-label"><svg class="icon"><use href="#i-cpu"/></svg> Modèle</div><div class="status-value" id="status-model">-</div></div>
+            <div class="status-card"><div class="status-label"><svg class="icon"><use href="#i-toggle"/></svg> Auto-accept</div><div class="status-value" id="status-auto"><svg class="icon"><use href="#i-lock"/></svg> désactivé</div></div>
+          </div>
+        </div>
+        <div id="panel-errors" class="panel">
+          <div class="panel-header"><h2><svg class="icon"><use href="#i-alert"/></svg> Journal des erreurs</h2><button class="btn-clear-panel" data-clear="errors"><svg class="icon"><use href="#i-trash"/></svg> Effacer</button></div>
+          <div class="errors-list" id="errors-list"><div class="empty-state">Aucune erreur.</div></div>
+        </div>
+        <div id="panel-editor" class="panel">
+          <div class="panel-header">
+            <h2><svg class="icon"><use href="#i-terminal"/></svg> Éditeur de code</h2>
+            <div style="display:flex; gap:8px;">
+              <button id="btn-refresh-files" class="btn-clear-panel"><svg class="icon"><use href="#i-refresh"/></svg> Actualiser</button>
+              <button id="btn-save-file" class="btn-clear-panel"><svg class="icon"><use href="#i-save"/></svg> Sauvegarder</button>
+            </div>
+          </div>
+          <div class="editor-layout">
+            <div class="file-tree" id="file-tree"><div class="empty-state">Clique sur « Éditeur » pour charger le dossier.</div></div>
+            <div class="editor-area">
+              <div class="editor-filepath" id="editor-filepath">Aucun fichier ouvert</div>
+              <textarea id="editor-content" class="editor-content" spellcheck="false" placeholder="Clique sur un fichier à gauche pour l'ouvrir..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <footer class="input-area">
+          <div class="quick-actions">
+            <button class="btn-action" data-command="/model"><svg class="icon"><use href="#i-cpu"/></svg> Modèle</button>
+            <button class="btn-action" data-command="/keys"><svg class="icon"><use href="#i-key"/></svg> Clés API</button>
+            <button class="btn-action" data-command="/auto"><svg class="icon"><use href="#i-toggle"/></svg> Auto</button>
+            <button class="btn-action" data-command="/status"><svg class="icon"><use href="#i-chart"/></svg> Statut</button>
+            <button class="btn-action" data-command="/help"><svg class="icon"><use href="#i-help"/></svg> Aide</button>
+          </div>
+          <div class="input-wrapper">
+            <textarea id="user-input" rows="1" placeholder="Tape ta demande à l'IA..." autocomplete="off"></textarea>
+            <button id="btn-send" class="btn-send"><svg class="icon"><use href="#i-send"/></svg></button>
+          </div>
+          <div class="input-hints"><span>Entrée : Envoyer</span><span>Shift+Entrée : Nouvelle ligne</span></div>
+        </footer>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODALES -->
+  <div id="modal-help" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-help"/></svg> Commandes disponibles</h2>
+    <div class="help-list">
+      <div class="help-row"><code>/model</code><span>Changer de fournisseur / modèle</span></div>
+      <div class="help-row"><code>/keys</code><span>Gérer les clés API</span></div>
+      <div class="help-row"><code>/auto</code><span>Basculer le mode auto-accept</span></div>
+      <div class="help-row"><code>/status</code><span>Statut de la session</span></div>
+      <div class="help-row"><code>/workspace</code><span>Changer le dossier de travail</span></div>
+      <div class="help-row"><code>/clear</code><span>Effacer le chat</span></div>
+      <div class="help-row"><code>/exit</code><span>Quitter l'agent</span></div>
+    </div>
+    <div class="modal-actions"><button class="btn" data-close="modal-help">Fermer</button></div>
+  </div></div>
+
+  <div id="modal-status" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-chart"/></svg> Statut de la session</h2>
+    <div class="status-info">
+      <div class="status-item"><span class="label">Workspace</span><span class="value" id="m-status-workspace">-</span></div>
+      <div class="status-item"><span class="label">Provider</span><span class="value" id="m-status-provider">-</span></div>
+      <div class="status-item"><span class="label">Modèle</span><span class="value" id="m-status-model">-</span></div>
+      <div class="status-item"><span class="label">Auto-accept</span><span class="value" id="m-status-auto">-</span></div>
+    </div>
+    <div class="modal-actions"><button class="btn" data-close="modal-status">Fermer</button></div>
+  </div></div>
+
+  <div id="modal-keys" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-key"/></svg> Clés API</h2>
+    <div id="keys-list" class="keys-list"></div>
+    <div class="keys-form">
+      <select id="key-provider"></select>
+      <input type="password" id="key-value" placeholder="Nouvelle clé API...">
+      <button id="btn-save-key" class="btn btn-primary"><svg class="icon"><use href="#i-save"/></svg> Enregistrer</button>
+    </div>
+    <div class="modal-actions"><button class="btn" data-close="modal-keys">Fermer</button></div>
+  </div></div>
+
+  <div id="modal-model" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-cpu"/></svg> Choisir un modèle</h2>
+    <div id="model-step-provider">
+      <p class="modal-label">1. Choisis un fournisseur :</p>
+      <div id="providers-list" class="choice-list"></div>
+    </div>
+    <div id="model-step-model" class="hidden">
+      <p class="modal-label">2. Recherche puis choisis un modèle :</p>
+      <input type="text" id="model-search" placeholder="Rechercher...">
+      <div id="models-list" class="choice-list"></div>
+      <button class="btn" id="btn-back-providers"><svg class="icon"><use href="#i-chevron-left"/></svg> Retour</button>
+    </div>
+    <div class="modal-actions"><button class="btn" data-close="modal-model">Fermer</button></div>
+  </div></div>
+
+  <div id="modal-auto" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-toggle"/></svg> Mode auto-accept</h2>
+    <p id="auto-state" class="auto-state"></p>
+    <button id="btn-toggle-auto" class="btn btn-primary">Basculer le mode</button>
+    <div class="modal-actions"><button class="btn" data-close="modal-auto">Fermer</button></div>
+  </div></div>
+
+  <div id="modal-workspace" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-folder"/></svg> Dossier de travail</h2>
+    <p class="modal-label">Dans quel dossier l'agent doit-il travailler ?</p>
+    <p class="modal-hint">Dossier actuel : <code id="ws-current">-</code></p>
+    <input type="text" id="ws-path" class="modal-input" placeholder="Chemin absolu ou relatif (vide = dossier actuel)" autocomplete="off">
+    <div class="modal-actions">
+      <button id="ws-use-current" class="btn"><svg class="icon"><use href="#i-folder"/></svg> Dossier actuel</button>
+      <button id="ws-submit" class="btn btn-primary"><svg class="icon"><use href="#i-check"/></svg> Valider</button>
+    </div>
+  </div></div>
+
+  <div id="modal-confirm" class="modal hidden"><div class="modal-content">
+    <h2><svg class="icon"><use href="#i-alert"/></svg> <span id="confirm-title">Confirmation</span></h2>
+    <p id="confirm-text" class="confirm-text"></p>
+    <div class="modal-actions" id="confirm-buttons"></div>
+  </div></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

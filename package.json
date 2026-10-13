@@ -1,0 +1,55 @@
+{
+  "name": "khorgo",
+  "version": "1.0.5",
+  "description": "Khorgo - Agent de développement IA en ligne de commande",
+  "main": "bin/khorgo.js",
+  "bin": {
+    "khorgo": "bin/khorgo.js"
+  },
+  "files": [
+    "agent.js",
+    "bin/khorgo.js",
+    "keyStore.js",
+    "modelManager.js",
+    "server.js",
+    "public/**/*"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/khorgo.js",
+    "agent": "node agent.js",
+    "check": "node --check agent.js && node --check modelManager.js && node --check keyStore.js && node --check server.js",
+    "test": "npm run check",
+    "prepublishOnly": "npm run check"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "openai",
+    "anthropic",
+    "gemini"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@google/genai": "^2.17.1",
+    "chalk": "^4.1.2",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "fs-extra": "^11.2.0",
+    "inquirer": "^8.2.5",
+    "keytar": "^7.9.0",
+    "openai": "^7.5.0",
+    "ora": "^5.4.1",
+    "socket.io": "^4.8.1",
+    "strip-ansi": "^6.0.1"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  }
+}
