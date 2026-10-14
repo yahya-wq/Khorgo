@@ -14,6 +14,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- CodeMirror 6 pour coloration syntaxique -->
+<script type="module">
+  import {EditorView, basicSetup} from 'https://esm.run/@codemirror/basic-setup';
+  import {javascript} from 'https://esm.run/@codemirror/lang-javascript';
+  import {python} from 'https://esm.run/@codemirror/lang-python';
+  import {html} from 'https://esm.run/@codemirror/lang-html';
+  import {css} from 'https://esm.run/@codemirror/lang-css';
+  import {json} from 'https://esm.run/@codemirror/lang-json';
+  import {markdown} from 'https://esm.run/@codemirror/lang-markdown';
+  import {oneDark} from 'https://esm.run/@codemirror/theme-one-dark';
+  
+
+  window.CodeMirror = {
+    EditorView, basicSetup,
+    javascript, python, html, css, json, markdown,
+    oneDark
+  };
+</script>
 </head>
 <body>
   <!-- Sprite d'icônes monochromes (remplace tous les émojis) -->

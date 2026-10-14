@@ -875,3 +875,20 @@ h2 .icon, .modal-content h2 .icon { width: 0.85em; height: 0.85em; margin-right:
   cursor: pointer;
 }
 .error-content a:hover { text-decoration-color: var(--ink); }
+
+.cm-editor {
+  height: 100%;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+
+.cm-editor .cm-scroller {
+  overflow: auto;
+}
+
+.editor-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}

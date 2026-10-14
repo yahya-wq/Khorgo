@@ -1,6 +1,6 @@
-// ============================================================================
-// KHORGO WEB CLIENT — version finale corrigée
-// ============================================================================
+
+
+
 const socket = io();
 
 const AppState = {
@@ -20,7 +20,7 @@ let actionDescription = "";
 let lastLineText = "";
 let lastLineTime = 0;
 
-// ---------- DOM sécurisé ----------
+
 function el(id) { return document.getElementById(id); }
 function on(id, event, fn) {
   const node = el(id);
@@ -48,7 +48,67 @@ const DOM = {
   editorContent: el("editor-content")
 };
 
-// ---------- Navigation panneaux ----------
+
+
+let editorView = null;
+let currentFile = null;
+
+function initEditor() {
+  const editorContainer = document.getElementById('editor-content');
+  if (!window.CodeMirror) return;
+  
+  const { EditorView, basicSetup, oneDark } = window.CodeMirror;
+  
+  editorView = new EditorView({
+    doc: '',
+    extensions: [basicSetup, oneDark],
+    parent: editorContainer.parentElement
+  });
+  
+  editorContainer.style.display = 'none';
+}
+
+function getLanguageExtension(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const { javascript, python, html, css, json, markdown } = window.CodeMirror;
+  
+  const langMap = {
+    'js': javascript(),
+    'jsx': javascript({ jsx: true }),
+    'ts': javascript({ typescript: true }),
+    'tsx': javascript({ typescript: true, jsx: true }),
+    'py': python(),
+    'html': html(),
+    'css': css(),
+    'json': json(),
+    'md': markdown()
+  };
+  
+  return langMap[ext] || [];
+}
+
+function openFileInEditor(filePath, content) {
+  currentFile = filePath;
+  if (!editorView) initEditor();
+  
+  const langExt = getLanguageExtension(filePath);
+  const { EditorView, basicSetup, oneDark } = window.CodeMirror;
+  
+  editorView.destroy();
+  editorView = new EditorView({
+    doc: content,
+    extensions: [basicSetup, oneDark, ...langExt],
+    parent: document.getElementById('editor-content').parentElement
+  });
+  
+  document.getElementById('editor-filepath').textContent = filePath;
+}
+
+function getEditorContent() {
+  return editorView ? editorView.state.doc.toString() : '';
+}
+
+
 document.querySelectorAll(".nav-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
@@ -68,13 +128,13 @@ document.querySelectorAll(".btn-clear-panel").forEach(btn => {
   });
 });
 
-// ---------- Modales ----------
+
 function openModal(id) { const m = el(id); if (m) m.classList.remove("hidden"); }
 function closeModal(id) { const m = el(id); if (m) m.classList.add("hidden"); }
 document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", () => closeModal(b.dataset.close)));
 document.querySelectorAll(".modal").forEach(o => o.addEventListener("click", e => { if (e.target === o) o.classList.add("hidden"); }));
 
-// ---------- Nettoyage ----------
+
 function cleanLine(line) {
   return line
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
@@ -86,16 +146,16 @@ function cleanLine(line) {
 }
 function escapeHtml(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
 
-// ---------- Rendu Markdown léger (sûr : tout passe par escapeHtml avant d'insérer du HTML) ----------
-// Supporte : blocs de code ``` ```, code inline `x`, gras **x**, italique *x*/_x_,
-// liens [texte](url), listes à puces "-"/"*", listes numérotées "1.", paragraphes.
-// Volontairement minimal (pas de lib externe) : suffisant pour des réponses d'agent IA.
+
+
+
+
 let __codeBlockSeq = 0;
 function renderMarkdown(raw) {
   if (!raw) return "";
 
-  // 1) Extraire les blocs de code en premier (avant tout autre traitement,
-  // pour que leur contenu ne soit jamais interprété comme du markdown).
+
+
   const blocks = [];
   let text = raw.replace(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g, (_, lang, code) => {
     const id = "cb-" + (++__codeBlockSeq);
@@ -103,7 +163,7 @@ function renderMarkdown(raw) {
     return `\u0000CODEBLOCK${blocks.length - 1}\u0000`;
   });
 
-  // 2) Échapper le HTML du reste, puis appliquer le markdown inline.
+
   const lines = text.split("\n");
   const htmlLines = [];
   let inList = null; // "ul" | "ol" | null
@@ -148,7 +208,7 @@ function renderMarkdown(raw) {
 
   let html = htmlLines.join("\n").replace(/(?:^|\n)(?:\n)+/g, "\n");
 
-  // 3) Réinjecter les blocs de code sous forme de <pre><code> + bouton copier.
+
   html = html.replace(/\u0000CODEBLOCK(\d+)\u0000/g, (_, i) => {
     const b = blocks[Number(i)];
     const langClass = b.lang ? ` class="lang-${escapeHtml(b.lang)}"` : "";
@@ -159,7 +219,7 @@ function renderMarkdown(raw) {
   return html;
 }
 
-// Copie du contenu d'un bloc de code au clic (délégation sur le chat entier).
+
 document.addEventListener("click", (e) => {
   const btn = e.target.closest(".btn-copy-code");
   if (!btn) return;
@@ -176,20 +236,20 @@ function captureSessionInfo(cleaned) {
   if (cleaned.includes("Workspace :")) { AppState.session.workspace = cleaned.split("Workspace :")[1].trim(); if (DOM.stWorkspace) DOM.stWorkspace.textContent = AppState.session.workspace; return true; }
   if (cleaned.includes("Provider :")) { AppState.session.provider = cleaned.split("Provider :")[1].trim(); if (DOM.stProvider) DOM.stProvider.textContent = AppState.session.provider; return true; }
   if (cleaned.includes("Model :") || cleaned.includes("Modèle :")) { AppState.session.model = cleaned.split(/Model :|Modèle :/)[1].trim(); if (DOM.stModel) DOM.stModel.textContent = AppState.session.model; return true; }
-  // ⚠️ Ordre important : "DÉSACTIVÉ" contient littéralement "ACTIVÉ" comme
-  // sous-chaîne — le vérifier en premier, sinon toute ligne annonçant l'état
-  // désactivé était mal classée comme activé.
+
+
+
   if (cleaned.includes("DÉSACTIVÉ")) { AppState.autoAccept = false; if (DOM.stAuto) DOM.stAuto.innerHTML = '<svg class="icon"><use href="#i-lock"/></svg> désactivé'; return true; }
   if (cleaned.includes("ACTIVÉ")) { AppState.autoAccept = true; if (DOM.stAuto) DOM.stAuto.innerHTML = '<svg class="icon"><use href="#i-check"/></svg> activé'; return true; }
   return false;
 }
 
-// Bannière ASCII imprimée par agent.js au démarrage (nom du projet + astuce
-// "/help") : une fois les caractères de cadre et les couleurs retirés par
-// cleanLine(), il ne reste que du texte brut sans marqueur reconnaissable.
-// Sans ce filtre, ces lignes tombaient dans le cas par défaut de
-// classifyMessage() et s'affichaient comme si l'IA les avait dites — alors
-// que l'identité "Khorgo" est déjà affichée dans l'en-tête de la page.
+
+
+
+
+
+
 function isStartupBanner(cleaned) {
   return (
     cleaned === "khorgo - AI Development Agent" ||
@@ -198,38 +258,38 @@ function isStartupBanner(cleaned) {
   );
 }
 
-// ---------- Routage ----------
+
 function classifyMessage(cleaned) {
   if (!cleaned || cleaned.length < 2) return null;
   if (cleaned.includes("[ERREUR]") || cleaned.includes("❌")) return { type: "error", content: cleaned };
   const toolMatch = cleaned.match(/\b(Read|Write|Edit|Explore|Search|Command)\b\s+(.+)$/i);
   if (toolMatch) {
-    // ✓ marque la fin d'un outil (formatToolLog status="success") ; toute
-    // autre variante (…) marque le début (status="running"). Permet à
-    // addActivity() de mettre à jour la ligne existante au lieu d'en
-    // ajouter une seconde identique.
+
+
+
+
     const status = cleaned.includes("✓") ? "success" : "running";
     return { type: "tool", tool: toolMatch[1], target: toolMatch[2], status };
   }
-  // Lignes du spinner ora ("Exécution :"/"Terminé :"/"Échec :") : pur doublon
-  // visuel de formatToolLog (running/success) pour run_command — et en cas
-  // d'échec réel, l'erreur est de toute façon déjà renvoyée séparément avec
-  // un préfixe ❌ (catché plus haut). On les ignore plutôt que de créer une
-  // 3ᵉ ligne d'activité pour la même commande.
+
+
+
+
+
   if (/^(Exécution|Terminé|Échec)\s*:/i.test(cleaned)) return null;
-  // Réponse à une confirmation ("✅ Approuvé." / "🚫 Refusé.", après [o/n/t]) :
-  // ni une erreur, ni une activité d'outil — un statut de session. Vérifié
-  // AVANT la règle générique ✅/✓ ci-dessous : sinon seul "Approuvé" (qui
-  // contient ✅) passait en Activité, et "Refusé" (aucun marqueur reconnu)
-  // retombait par défaut dans la bulle de chat comme si l'IA l'avait dit.
+
+
+
+
+
   if (cleaned.includes("Approuvé") || cleaned.includes("Refusé")) return { type: "system", content: cleaned };
-  // Bascule auto-accept (via /auto, la modale ⚡, ou "toujours accepter"
-  // pendant une confirmation) : même raisonnement. "ACTIVÉ" contient ✅ et
-  // passait en Activité ; "DÉSACTIVÉ" n'a aucun marqueur reconnu (et la
-  // règle "Auto-accept" ci-dessous, en majuscule, ne matche jamais ces
-  // lignes qui écrivent "auto-accept" en minuscule) donc retombait dans la
-  // bulle de chat. Vérifié ici, avant ✅/✓, pour que les deux états soient
-  // routés pareil.
+
+
+
+
+
+
+
   if (cleaned.includes("auto-accept") && (cleaned.includes("ACTIVÉ") || cleaned.includes("DÉSACTIVÉ"))) {
     return { type: "system", content: cleaned };
   }
@@ -248,7 +308,7 @@ function classifyMessage(cleaned) {
   return { type: "assistant", content: cleaned };
 }
 
-// ---------- Affichage ----------
+
 function updateBadge(node, n) { if (!node) return; node.textContent = n; node.style.display = n > 0 ? "block" : "none"; }
 function addAssistant(text) {
   if (!DOM.chat) return;
@@ -299,9 +359,9 @@ function addSystem(text) {
 let lastRunningActivity = null; // { tool, target, node } — dernière ligne "en cours" en attente de complétion
 function addActivity(tool, target, status) {
   if (!DOM.activity) return;
-  // Une ligne "success" pour le même outil+cible que la dernière ligne
-  // "running" en attente : on met à jour cette ligne en place plutôt que
-  // d'empiler une seconde entrée identique pour la même action.
+
+
+
   if (status === "success" && lastRunningActivity &&
       lastRunningActivity.tool === tool && lastRunningActivity.target === target) {
     lastRunningActivity.node.classList.remove("running");
@@ -376,7 +436,7 @@ function getToolIcon(t) {
   return `<svg class="icon"><use href="#${id}"/></svg>`;
 }
 
-// ---------- Questions de l'agent → modales ----------
+
 function handleAgentQuestion(cleaned) {
   if (cleaned === "❯") return true;
   const cwdMatch = cleaned.match(/Dossier actuel : (.+)/i);
@@ -400,7 +460,7 @@ function handleAgentQuestion(cleaned) {
     actionDescription += cleaned + "\n";
     return true;
   }
-  // ✅ CORRECTION : regex oui/non avec crochets échappés (plus de faux positifs)
+
   if (/\[o\/n\]|\[O\/n\]|\[o\/N\]/i.test(cleaned) || /\[o\] oui/.test(cleaned)) {
     const btns = [{ label: "Oui", icon: "i-check", value: "o", primary: true }, { label: "Non", icon: "i-x", value: "n" }];
     if (cleaned.includes("[t]")) btns.push({ label: "Toujours", icon: "i-unlock", value: "t" });
@@ -435,7 +495,7 @@ on("ws-submit", "click", () => { const v = (el("ws-path")?.value || "").trim(); 
 on("ws-use-current", "click", () => { socket.emit("user-input", ""); closeModal("modal-workspace"); });
 on("ws-path", "keydown", e => { if (e.key === "Enter") el("ws-submit")?.click(); });
 
-// ---------- Commandes / → modales ----------
+
 function handleSlashCommand(cmd) {
   switch (cmd) {
     case "/help": openModal("modal-help"); break;
@@ -464,7 +524,7 @@ function fillAutoModal() {
 }
 on("btn-toggle-auto", "click", () => { closeModal("modal-auto"); socket.emit("user-input", "/auto"); });
 
-// ---------- Clés API ----------
+
 let keysTimeout = null;
 function openKeysModal() {
   openModal("modal-keys");
@@ -477,12 +537,12 @@ function openKeysModal() {
   }, 2500);
   socket.emit("get-keys");
 }
-// ---------- Canal structuré (assistant / outils / erreurs / statut) ----------
-// Contrepartie côté client du pont IPC corrigé dans server.js : ces
-// événements remplacent, pour ces catégories, le parsing fragile par regex
-// de classifyMessage() sur le flux texte "agent-output". Le flux texte reste
-// utilisé pour tout ce qui n'est pas encore migré (menus /model /keys tapés
-// directement, questions de confirmation [o/n/t], bannière de démarrage).
+
+
+
+
+
+
 socket.on("agent-assistant", ({ text } = {}) => {
   if (text && text.trim()) addAssistant(text);
 });
@@ -550,7 +610,7 @@ on("btn-save-key", "click", () => {
   const v = el("key-value"); if (v) v.value = "";
 });
 
-// ---------- Modèle ----------
+
 let providersTimeout = null;
 function openModelModal() {
   AppState.models = []; AppState.selectedProvider = null;
@@ -618,7 +678,7 @@ on("btn-back-providers", "click", () => {
   el("model-step-provider")?.classList.remove("hidden");
 });
 
-// ---------- Éditeur ----------
+
 let dirTimeout = null;
 function requestDir(dirPath) {
   if (DOM.tree) DOM.tree.innerHTML = '<div class="loading">Chargement...</div>';
@@ -673,12 +733,12 @@ on("btn-save-file", "click", () => {
   socket.emit("write-file", { filePath: AppState.editorFile, content: DOM.editorContent?.value || "" });
 });
 
-// ---------- Auto-actualisation de l'éditeur ----------
+
 function editorPanelActive() {
   const p = el("panel-editor");
   return !!p && p.classList.contains("active");
 }
-// ✅ CORRECTION : AppState.editorDir (editorCurrentDir n'existait pas)
+
 function autoRefreshTree() {
   socket.emit("list-dir", { dirPath: AppState.editorDir || null });
 }
@@ -689,7 +749,7 @@ socket.on("agent-output", (raw) => {
   if (/write_file|edit_file|\bWrite\b|\bEdit\b/.test(raw)) autoRefreshTree();
 });
 
-// ---------- WebSocket ----------
+
 socket.on("connect", () => {
   AppState.isConnected = true;
   if (DOM.statusDot) DOM.statusDot.className = "status-dot connected";
@@ -725,7 +785,7 @@ socket.on("agent-output", rawText => {
 });
 socket.on("agent-exited", code => { addError(`Agent terminé (code : ${code})`); addSystem(`Agent terminé (code : ${code})`); });
 
-// ---------- Saisie ----------
+
 const LOCAL_ONLY_COMMANDS = new Set(["/help", "/status", "/keys", "/model", "/auto", "/clear"]);
 function sendMessage() {
   const text = (DOM.input?.value || "").trim();
@@ -746,16 +806,16 @@ document.querySelectorAll(".btn-action").forEach(b => b.addEventListener("click"
 on("btn-restart", "click", () => { socket.emit("restart-agent"); addSystem("Redémarrage de l'agent..."); });
 on("btn-clear", "click", () => { if (DOM.chat) DOM.chat.innerHTML = ""; AppState.lastChatRole = null; lastAssistantDiv = null; });
 
-// ---------- Init ----------
+
 updateBadge(DOM.badgeActivity, 0);
 updateBadge(DOM.badgeErrors, 0);
 addSystem("Connecté à Khorgo — Interface Web");
 addSystem("Tape /help ou utilise les boutons pour ouvrir les onglets.");
 if (DOM.input) DOM.input.focus();
 
-// ============================================================================
-// 🎨 COLORATION SYNTAXIQUE (CSS inclus)
-// ============================================================================
+
+
+
 (function () {
   try {
     const ta = document.getElementById("editor-content");
@@ -763,8 +823,8 @@ if (DOM.input) DOM.input.focus();
     if (ta.dataset.hlReady) return;
     ta.dataset.hlReady = "1";
 
-    // Limite de taille : au-delà, on n'active pas la coloration (perf) mais
-    // le textarea reste 100% utilisable en texte brut.
+
+
     const MAX_HIGHLIGHT_SIZE = 400000; // ~400 Ko
 
     const style = document.createElement("style");
@@ -782,8 +842,8 @@ if (DOM.input) DOM.input.focus();
     `;
     document.head.appendChild(style);
 
-    // Rattache le textarea à un wrapper dédié, quelle que soit sa structure
-    // actuelle dans le DOM (on ne suppose rien sur le parent existant).
+
+
     let wrap = ta.parentElement;
     if (!wrap || !wrap.classList.contains("editor-wrap")) {
       wrap = document.createElement("div");
@@ -804,9 +864,9 @@ if (DOM.input) DOM.input.focus();
       codeEl = pre.querySelector("code") || pre;
     }
 
-    // Styles critiques posés directement en JS (!important) : garantit le
-    // bon rendu même si la feuille de style ci-dessus ne matche pas pour une
-    // raison quelconque (ordre de chargement, doublon d'ID, etc.).
+
+
+
     function forceStyle(node, props) {
       for (const k in props) node.style.setProperty(k, props[k], "important");
     }
@@ -867,8 +927,8 @@ if (DOM.input) DOM.input.focus();
   }
 
     function showPlainFallback() {
-      // Aucun calque noir orphelin : soit le pre est à jour, soit il est
-      // masqué et le textarea redevient lisible en texte brut.
+
+
       pre.style.display = "none";
       ta.style.setProperty("color", "#d4d4d4", "important");
     }
@@ -917,41 +977,41 @@ rawMessage = errObj.message || "";
 rawMessage = String(rawInput);
 }
 
-// 1. Modèle non trouvé ou obsolète (Code 404 / NOT_FOUND)
+
 if (code === 404 || status === "NOT_FOUND" || rawMessage.includes("no longer available")) {
 return "Le modèle sélectionné n'est plus disponible ou a été mis à jour par le fournisseur. Veuillez choisir un autre modèle via le bouton Modèle ci-dessous.";
 }
 
-// 2. Clé API invalide ou absente (Code 401 / 403 / UNAUTHENTICATED)
+
 if (code === 401 || code === 403 || status === "UNAUTHENTICATED" || rawMessage.includes("API key")) {
 return "La clé API configurée est invalide ou expirée. Veuillez vérifier vos accès dans l'onglet Clés API.";
 }
 
-// 3. Quota ou limite de requêtes dépassée (Code 429 / RESOURCE_EXHAUSTED)
+
 if (code === 429 || status === "RESOURCE_EXHAUSTED" || rawMessage.includes("quota")) {
 return "La limite de requêtes ou le quota de votre compte a été atteint. Veuillez patienter quelques instants ou vérifier la formule de votre compte.";
 }
 
-// 4. Erreur serveur du fournisseur (Code 500 / 503 / INTERNAL)
+
 if (code >= 500 || status === "INTERNAL" || status === "UNAVAILABLE") {
 return "Le service d'IA rencontre des difficultés temporaires. Veuillez réessayer dans quelques instants.";
 }
 
-// 5. Erreur de connexion réseau
+
 if (rawMessage.includes("Failed to fetch") || rawMessage.includes("NetworkError")) {
 return "Impossible de contacter le serveur. Vérifiez votre connexion internet puis réessayez.";
 }
 
-// Message générique par défaut si l'erreur est inconnue
+
 return rawMessage || "Une erreur inattendue est survenue. Veuillez réessayer.";
 }
 
-// ==============================
-// renderKhorgoErrorCard
-// ==============================
-// Construit le HTML de la carte d'erreur (icône + message nettoyé + croix
-// de fermeture), au format des bulles .message.error déjà stylées dans
-// style.css — pas une nouvelle charte, juste le markup qui manquait.
+
+
+
+
+
+
 function renderKhorgoErrorCard(rawInput) {
   const cleanMessage = parseKhorgoError(rawInput);
   return `<div class="message error">
@@ -963,13 +1023,13 @@ function renderKhorgoErrorCard(rawInput) {
   </div>`;
 }
 
-// ==============================
-// addErrorCard
-// ==============================
-// Affiche une carte d'erreur propre dans le fil de discussion (DOM.chat),
-// à la place du JSON brut renvoyé par l'API du fournisseur. Suit le même
-// contrat que addAssistant()/addSystem() (arrêt du spinner "thinking",
-// scroll auto, mise à jour de lastChatRole).
+
+
+
+
+
+
+
 function addErrorCard(rawInput) {
   if (!DOM.chat) return;
   removeThinking();

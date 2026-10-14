@@ -4,7 +4,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 const readline = require("readline");
 
-// Nouvelles dépendances UI
+
 const chalk = require("chalk");
 const ora = require("ora");
 
@@ -14,25 +14,25 @@ const keyStore = require("./keyStore");
 
 let WORKSPACE = process.cwd();
 
-// Mode web : l'agent est piloté par server.js (interface graphique), donc
-// tous les menus interactifs texte redondants avec les fenêtres modales
-// du navigateur doivent être évités.
+
+
+
 const WEB_MODE = process.env.KHORGO_WEB === "1";
 
-// ora() écrit ses frames d'animation sur stderr par défaut. En mode web,
-// server.js traite tout stderr comme une vraie erreur ("[ERREUR] ...") —
-// donc un spinner purement décoratif ("L'agent réfléchit...") apparaissait
-// à tort comme une erreur à chaque tour. sayThinking()/sayTool() remplissent
-// déjà ce rôle proprement via le canal IPC structuré : le spinner ora ne
-// sert donc plus qu'en CLI pure (WEB_MODE = false).
+
+
+
+
+
+
 function spin(text) {
   if (WEB_MODE) return { stop() {}, succeed() {}, fail() {} };
   return ora(chalk.cyan(text)).start();
 }
 
-// ==============================
-// FICHIERS PROTÉGÉS (Invisibles pour l'agent)
-// ==============================
+
+
+
 const PROTECTED_FILES = new Set([
   "agent.js",
   "modelManager.js",
@@ -45,47 +45,47 @@ const PROTECTED_FILES = new Set([
   ".git"
 ]);
 
-// ==============================
-// SORTIE STRUCTURÉE (web) vs TERMINAL (CLI)
-// ==============================
-// AVANT : toute la sortie de l'agent passait par console.log() en texte
-// libre (emojis, couleurs), et server.js/app.js devaient RE-DEVINER le
-// sens de chaque ligne après coup via des regex (classifyMessage() côté
-// client). C'est fragile par construction : une reformulation anodine
-// cassait le routage, et il fallait même une fonction dédiée plus bas
-// (neutralizeProtocolMarkers) pour empêcher le texte généré par l'IA de
-// collisionner avec les marqueurs de protocole eux-mêmes (✅ / ❌ / "Confirmer ?").
-//
-// MAINTENANT : en mode web (KHORGO_WEB=1), chaque catégorie de sortie part
-// vers server.js sous forme d'événement STRUCTURÉ ({type, ...}) via le
-// canal IPC (process.send) — ce canal existait déjà côté server.js
-// (agentProcess.on("message")) mais n'était jamais utilisé côté agent :
-// tout partait quand même en texte brut sur stdout. Le rendu CLI (npm run
-// agent, hors interface web) reste identique caractère pour caractère.
-//
-// Portée de cette migration : les catégories à fort enjeu — réponses de
-// l'IA, activité des outils, erreurs, avertissements, statut de session —
-// passent maintenant par ce canal. Les questions de confirmation
-// ([o/n/t], choix de dossier) restent pour l'instant sur le canal texte
-// existant (déjà durci par neutralizeProtocolMarkers) : les migrer aussi
-// demanderait de changer le mécanisme de réponse (pas seulement l'affichage
-// de la question), ce qui est un chantier à part.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function emitStructured(type, payload = {}) {
   if (WEB_MODE && typeof process.send === "function") {
     try {
       process.send({ type, ...payload });
     } catch {
-      // Canal IPC fermé (process parent en train de se terminer) : sans
-      // conséquence pour l'agent lui-même, on ignore.
+
+
     }
   }
 }
 
-// Réponse texte de l'IA — c'était le cas par défaut de classifyMessage()
-// côté client (aucun marqueur reconnu ne tombe ici), donc le plus fragile :
-// n'importe quelle ligne système non reconnue finissait affichée comme si
-// l'IA l'avait dite (c'est ce qui causait la bannière de démarrage affichée
-// en bulle "assistant").
+
+
+
+
+
 function sayAssistant(text) {
   const safe = text || "(aucun texte)";
   if (WEB_MODE) emitStructured("assistant", { text: safe });
@@ -102,31 +102,31 @@ function sayWarning(text) {
   else console.log(text);
 }
 
-// Indicateur "l'agent réfléchit" — actif entre l'envoi de la requête au
-// modèle et la réception de sa réponse (y compris pendant les retries de
-// callWithRetry). En web, remplace le besoin de deviner cet état depuis le
-// spinner CLI (qui n'était de toute façon jamais transmis au client).
+
+
+
+
 function sayThinking(active) {
   if (WEB_MODE) emitStructured("thinking", { active });
 }
 
-// Notice système ponctuelle et neutre (ni réponse de l'IA, ni erreur).
+
 function sayNotice(text) {
   if (WEB_MODE) emitStructured("notice", { text });
   else console.log(text);
 }
 
-// Statut de session structuré — remplace le parsing de lignes
-// "Workspace : x" / "Provider : y" par captureSessionInfo() côté client.
-// N'importe quel champ omis est laissé tel quel côté UI.
+
+
+
 function sayStatus(status) {
   if (WEB_MODE) emitStructured("status", status || {});
 }
 
-// Activité d'un outil (Read/Write/Edit/Explore/Search/Command).
-// En CLI, garde le formatage coloré existant (formatToolLog, défini plus
-// bas) ; en web, envoie directement les champs structurés au lieu de
-// forcer le client à les extraire d'une chaîne formatée avec des regex.
+
+
+
+
 function sayTool(toolName, args, status) {
   if (WEB_MODE) {
     const labels = {
@@ -142,13 +142,13 @@ function sayTool(toolName, args, status) {
 }
 
 
-// Encapsule un appel API pour retenter automatiquement en cas d'erreur
-// transitoire (rate-limit, erreur serveur, coupure réseau), au lieu de
-// faire échouer toute la tâche en cours pour un problème temporaire.
-// 🔴 CORRECTION : cette fonction était définie DEUX FOIS dans le fichier
-// d'origine (la seconde définition écrasait silencieusement la première,
-// qui contenait le message spécifique pour le code 429). Fusionnée ici
-// en une seule version qui garde les deux comportements.
+
+
+
+
+
+
+
 
 async function callWithRetry(fn, { maxRetries = 3, baseDelayMs = 1000 } = {}) {
   let lastError;
@@ -184,19 +184,84 @@ async function callWithRetry(fn, { maxRetries = 3, baseDelayMs = 1000 } = {}) {
   throw lastError;
 }
 
-function safePath(filePath) {
-  const absolutePath = path.resolve(WORKSPACE, filePath);
 
-  // 🔴 Trouver le premier ancêtre qui existe réellement, pour pouvoir
-  // résoudre les symlinks même quand le fichier/dossier final n'existe pas encore.
+
+
+
+
+
+
+
+
+
+let RESOLVED_WORKSPACE = null;
+
+function getResolvedWorkspace() {
+  if (RESOLVED_WORKSPACE) return RESOLVED_WORKSPACE;
+
+  try {
+
+    RESOLVED_WORKSPACE = fs.realpathSync(WORKSPACE);
+  } catch (error) {
+
+
+    RESOLVED_WORKSPACE = path.resolve(WORKSPACE);
+  }
+
+
+
+  if (process.platform === "win32") {
+    RESOLVED_WORKSPACE = RESOLVED_WORKSPACE.toLowerCase().replace(/\//g, "\\");
+  }
+
+  return RESOLVED_WORKSPACE;
+}
+
+
+function normalizeForComparison(p) {
+  if (process.platform === "win32") {
+    return p.toLowerCase().replace(/\//g, "\\");
+  }
+  return p;
+}
+
+function isInsideWorkspace(candidatePath) {
+  const root = getResolvedWorkspace();
+  const normalized = normalizeForComparison(candidatePath);
+
+
+  return normalized === root || normalized.startsWith(root + path.sep);
+}
+
+function safePath(filePath) {
+
+  if (!filePath || typeof filePath !== "string") {
+    throw new Error("Chin de fichier invalide");
+  }
+
+
+  if (filePath.indexOf("\0") !== -1) {
+    throw new Error("Chemin invalide : caractère nul détecté");
+  }
+
+  const root = getResolvedWorkspace();
+  const absolutePath = path.resolve(root, filePath);
+
+
+
+
   let existingAncestor = absolutePath;
-  let remainder = ""; // partie du chemin qui n'existe pas encore (ex: "sousdossier/nouveau.txt")
+  let remainder = "";
+
+
+  const MAX_DEPTH = 1024;
+  let depth = 0;
 
   while (!fs.existsSync(existingAncestor)) {
     const parent = path.dirname(existingAncestor);
 
-    if (parent === existingAncestor) {
-      // On a atteint la racine du filesystem sans rien trouver : cas anormal.
+    if (parent === existingAncestor || depth++ > MAX_DEPTH) {
+
       break;
     }
 
@@ -204,33 +269,79 @@ function safePath(filePath) {
     existingAncestor = parent;
   }
 
-  // Résoudre les symlinks sur la partie qui existe réellement
-  const resolvedAncestor = fs.realpathSync(existingAncestor);
 
-  // Recomposer le chemin final avec la partie qui n'existe pas encore
+
+
+  let resolvedAncestor;
+  try {
+    resolvedAncestor = fs.realpathSync(existingAncestor);
+  } catch (error) {
+
+    throw new Error(
+      `Impossible de résoudre le chemin : ${existingAncestor} (${error.message})`
+    );
+  }
+
+
   const fullPath = remainder
     ? path.join(resolvedAncestor, remainder)
     : resolvedAncestor;
 
-  // Vérification 1 : Ne pas sortir du dossier de travail (sur le vrai chemin résolu)
-  if (fullPath !== WORKSPACE && !fullPath.startsWith(WORKSPACE + path.sep)) {
-    throw new Error(`Accès refusé hors de l'espace de travail : ${filePath}`);
+
+
+
+  if (!isInsideWorkspace(fullPath)) {
+    throw new Error(
+      `Accès refusé hors de l'espace de travail : ${filePath}`
+    );
   }
 
-  // Vérification 2 : Bloquer l'accès au code source de l'agent (insensible à la casse)
-  const relativePath = path.relative(WORKSPACE, fullPath);
+
+
+
+
+
+
+  try {
+    const lstat = fs.lstatSync(fullPath);
+
+    if (lstat.isSymbolicLink()) {
+
+      const linkTarget = fs.realpathSync(fullPath);
+
+      if (!isInsideWorkspace(linkTarget)) {
+        throw new Error(
+          `Accès refusé : '${filePath}' est un symlink pointant hors de l'espace de travail`
+        );
+      }
+    }
+  } catch (error) {
+
+    if (error.message.startsWith("Accès refusé")) {
+      throw error;
+    }
+
+
+  }
+
+
+
+
+  const relativePath = path.relative(root, normalizeForComparison(fullPath));
   const topLevelEntity = relativePath.split(path.sep)[0].toLowerCase();
 
   const protectedLower = new Set([...PROTECTED_FILES].map(f => f.toLowerCase()));
 
   if (protectedLower.has(topLevelEntity)) {
-    throw new Error(`Accès refusé : '${topLevelEntity}' fait partie de mon code source interne.`);
+    throw new Error(
+      `Accès refusé : '${topLevelEntity}' fait partie de mon code source interne.`
+    );
   }
 
   return fullPath;
 }
 
-// 🔴 AJOUT : helper réutilisé par listFiles et searchFiles
+
 function isWithinWorkspace(fullPath) {
   let resolved = fullPath;
   try {
@@ -241,9 +352,9 @@ function isWithinWorkspace(fullPath) {
   return resolved === WORKSPACE || resolved.startsWith(WORKSPACE + path.sep);
 }
 
-// ==============================
-// OUTILS
-// ==============================
+
+
+
 
 function readFile(filePath, startLine, endLine) {
   const fullPath = safePath(filePath);
@@ -254,7 +365,7 @@ function readFile(filePath, startLine, endLine) {
 
   const content = fs.readFileSync(fullPath, "utf8");
 
-  // Si des lignes spécifiques sont demandées, on découpe le contenu
+
   if (startLine !== undefined || endLine !== undefined) {
     const lines = content.split('\n');
     const start = startLine ? Math.max(1, startLine) - 1 : 0;
@@ -265,8 +376,21 @@ function readFile(filePath, startLine, endLine) {
   return content;
 }
 
+const MAX_FILE_SIZE = 1024 * 1024; // 1 Mo (ajuste selon tes besoins)
+
 function writeFile(filePath, content) {
   const fullPath = safePath(filePath);
+
+
+  const contentSize = Buffer.byteLength(content, "utf8");
+  
+  if (contentSize > MAX_FILE_SIZE) {
+    throw new Error(
+      `Fichier trop volumineux : ${(contentSize / 1024 / 1024).toFixed(2)} Mo ` +
+      `(limite : ${(MAX_FILE_SIZE / 1024 / 1024).toFixed(0)} Mo). ` +
+      `Divise le contenu en plusieurs fichiers ou réduis la taille.`
+    );
+  }
 
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   fs.writeFileSync(fullPath, content, "utf8");
@@ -326,7 +450,7 @@ function listFiles(directory = ".") {
       const entryRelativePath = path.join(relativePath, entry.name);
 
       if (entry.isDirectory()) {
-        // Dossiers internes invisibles pour l'IA
+
         if (
           entry.name === "node_modules" ||
           entry.name === ".agent"
@@ -334,7 +458,7 @@ function listFiles(directory = ".") {
           continue;
         }
 
-        // 🔴 AJOUT : ignorer les symlinks qui pointent hors du workspace
+
         if (!isWithinWorkspace(entryPath)) {
           continue;
         }
@@ -363,13 +487,13 @@ function listFiles(directory = ".") {
 
 const SEARCH_MAX_RESULTS = 100;
 
-// 🔴 CORRECTION : dans le fichier d'origine, la branche "fichier" de la
-// boucle contenait seulement le commentaire `// ... reste inchangé
-// (lecture du fichier) ...` — aucun résultat n'était donc jamais poussé
-// dans `results`, et `search_files` retournait systématiquement un
-// tableau vide. Implémentation complète ci-dessous : lecture du fichier,
-// test ligne par ligne avec le regex, et arrêt dès que la limite est
-// atteinte.
+
+
+
+
+
+
+
 
 function searchFiles(pattern, directory = ".") {
   const fullPath = safePath(directory);
@@ -414,7 +538,7 @@ function searchFiles(pattern, directory = ".") {
           continue;
         }
 
-        // 🔴 AJOUT : ignorer les symlinks qui pointent hors du workspace
+
         if (!isWithinWorkspace(entryPath)) {
           continue;
         }
@@ -423,9 +547,9 @@ function searchFiles(pattern, directory = ".") {
         continue;
       }
 
-      // Lecture et recherche ligne par ligne dans le fichier.
-      // On ignore silencieusement les fichiers illisibles (binaires,
-      // permissions, etc.) plutôt que de faire échouer toute la recherche.
+
+
+
       let content;
       try {
         content = fs.readFileSync(entryPath, "utf8");
@@ -433,9 +557,9 @@ function searchFiles(pattern, directory = ".") {
         continue;
       }
 
-      // Heuristique simple pour éviter de scanner des binaires : si le
-      // contenu contient un octet nul, on considère que ce n'est pas du
-      // texte et on passe au fichier suivant.
+
+
+
       if (content.indexOf("\0") !== -1) {
         continue;
       }
@@ -479,11 +603,11 @@ function formatSearchResults(pattern, matches) {
   return output;
 }
 
-// ==============================
-// PERMISSIONS DES COMMANDES
-// ==============================
-// Système de filtrage simplifié : au lieu d'une liste noire trop restrictive,
-// nous nous concentrons sur le blocage des commandes destructrices connues.
+
+
+
+
+
 
 const ALLOWED_BASE_COMMANDS = [
   "node",
@@ -512,18 +636,18 @@ const BLOCKED_COMMAND_PATTERNS = [
   /wget.*\|\s*(sh|bash)/i
 ];
 
-// Substitution de commande : bloquer backticks et $()
+
 const COMMAND_SUBSTITUTION = /`|\$\(/;
 
-// 🔴 AJOUT SÉCURITÉ : node/python/python3 sont dans ALLOWED_BASE_COMMANDS
-// pour lancer des scripts DU PROJET (ex: "node build.js", "python test.py"),
-// mais leurs flags d'exécution de code inline ("-e"/"--eval"/"-p"/"--print"
-// pour node, "-c" pour python/python3) permettent d'exécuter n'importe quel
-// code arbitraire — qui, lui, n'est PAS soumis à safePath()/PROTECTED_FILES.
-// Sans ce garde-fou, "node -e \"require('fs').readFileSync('../../keyStore.js')\""
-// (ou pire, en écriture) contourne complètement le bac à sable du workspace
-// et la protection du code source de l'agent, tout en restant une commande
-// "autorisée" au sens de la liste blanche ci-dessus.
+
+
+
+
+
+
+
+
+
 const INLINE_EVAL_FLAGS = {
   node: [/^-e$/, /^--eval$/, /^-p$/, /^--print$/],
   python: [/^-c$/],
@@ -582,9 +706,9 @@ function assertCommandAllowed(command) {
     );
   }
 
-  // On découpe sur les opérateurs de chaînage (&&, ||, ;, |, &) et on
-  // vérifie chaque segment individuellement, pour empêcher de glisser
-  // une commande interdite après un enchaînement légitime.
+
+
+
   const segments = trimmed.split(/&&|\|\||;|\||&/);
 
   for (const segment of segments) {
@@ -592,15 +716,15 @@ function assertCommandAllowed(command) {
   }
 }
 
-// 🔴 CORRECTION MAJEURE : dans le fichier d'origine, le corps de
-// `runCommand` était remplacé par un bloc de code copié-collé depuis
-// `runTaskOpenAI` (confirmation utilisateur, spinner, messages.push...).
-// Ce bloc référençait des variables qui n'existent pas dans cette
-// fonction (`toolName`, `args`, `toolCall`, `messages`, `state`) et
-// n'exécutait donc jamais la commande — en plus de casser la syntaxe de
-// tout le fichier (accolades non refermées). `execSync` était importé
-// en haut du fichier mais jamais utilisé : c'est bien lui qu'il fallait
-// appeler ici.
+
+
+
+
+
+
+
+
+
 
 function runCommand(command) {
   assertCommandAllowed(command);
@@ -614,8 +738,8 @@ function runCommand(command) {
 
     return output || "(commande terminée sans sortie)";
   } catch (error) {
-    // execSync lève une exception si le code de sortie est non nul,
-    // mais stdout/stderr restent disponibles sur l'objet d'erreur.
+
+
     const stdout = error.stdout ? error.stdout.toString() : "";
     const stderr = error.stderr ? error.stderr.toString() : "";
 
@@ -627,9 +751,9 @@ function runCommand(command) {
   }
 }
 
-// ==============================
-// OUTILS DONNÉS À NEMOTRON
-// ==============================
+
+
+
 
 const tools = [
   {
@@ -757,14 +881,14 @@ const tools = [
   }
 ];
 
-// ==============================
-// LIMITER LA TAILLE DES RÉSULTATS D'OUTILS
-// ==============================
-// Sans plafond, un gros fichier lu, une recherche large ou un `list_files`
-// sur un gros dossier peuvent injecter des milliers de tokens dans
-// l'historique. Comme tout l'historique est renvoyé à CHAQUE tour, ça
-// ralentit chaque appel API suivant, même si le résultat n'était utile
-// qu'une fois. On tronque donc systématiquement avant de le stocker.
+
+
+
+
+
+
+
+
 
 const TOOL_RESULT_MAX_CHARS = 6000;
 
@@ -783,9 +907,9 @@ function truncateToolResult(text) {
   );
 }
 
-// ==============================
-// EXÉCUTER UN OUTIL
-// ==============================
+
+
+
 
 function executeTool(name, args) {
   switch (name) {
@@ -810,13 +934,13 @@ function executeTool(name, args) {
   }
 }
 
-// ==============================
-// CONFIRMATION UTILISATEUR
-// ==============================
-// Les outils qui modifient le disque ou exécutent du code arbitraire
-// doivent être approuvés par l'utilisateur avant d'être lancés, sauf
-// en mode "auto-accept" (activé via /auto ou en répondant "t" à une
-// confirmation).
+
+
+
+
+
+
+
 
 const TOOLS_REQUIRING_CONFIRMATION = new Set([
   "write_file",
@@ -824,19 +948,19 @@ const TOOLS_REQUIRING_CONFIRMATION = new Set([
   "run_command"
 ]);
 
-// app.js parse le flux texte de l'agent avec des règles fragiles : entre
-// autres, il détecte la fin d'un bloc "Action proposée" en cherchant la
-// sous-chaîne littérale "Confirmer ?", et route certaines lignes selon la
-// présence de ✅/❌. Si le code affiché dans un diff edit_file contient
-// lui-même ces séquences (ex: on édite ce fichier-ci), la détection côté
-// client peut se terminer prématurément ou mal classer la ligne. On
-// neutralise ces séquences dans les aperçus affichés (le texte reste
-// lisible, juste avec un espace insécable inséré).
+
+
+
+
+
+
+
+
 function neutralizeProtocolMarkers(text) {
-  // \u200B (espace de largeur nulle) n'appartient PAS à la classe \s en
-  // JavaScript : il survit au `.replace(/\s+/g, " ")` de cleanLine() côté
-  // client, contrairement à une espace insécable (\u00A0, elle, incluse
-  // dans \s et donc recollée).
+
+
+
+
   return text
     .replace(/Confirmer ?\?/g, "Confirmer\u200B ?")
     .replace(/✅/g, "✅\u200B")
@@ -878,10 +1002,10 @@ async function confirmAction(state, description) {
     return true;
   }
 
-  // La question elle-même (texte + [o/n/t]) reste sur le canal texte
-  // existant pour l'instant : la migrer demanderait aussi de changer le
-  // mécanisme de réponse côté UI (modale de confirmation), pas seulement
-  // l'affichage. Voir la note au-dessus de emitStructured().
+
+
+
+
   console.log(`\n⚠️  Action proposée :\n   ${description}`);
 
   const answer = await askUser(
@@ -904,27 +1028,27 @@ async function confirmAction(state, description) {
   return accepted;
 }
 
-// ==============================
-// AGENT
-// ==============================
 
-// Un seul readline.Interface pour toute la session, avec une file
-// d'attente pour les lignes reçues.
-//
-// POURQUOI UNE FILE ET PAS SIMPLEMENT rl.question() À CHAQUE APPEL :
-// readline émet un événement 'line' dès qu'une ligne est disponible,
-// QUE QUELQU'UN L'ATTENDE OU NON. Dans un terminal interactif classique
-// ce n'est pas un problème (l'utilisateur n'a pas encore tapé la ligne
-// suivante). Mais dès que l'entrée arrive d'un coup (script, entrée
-// redirigée, pipe), toutes les lignes peuvent être émises avant même
-// qu'on ait appelé question() pour les récupérer — les lignes émises
-// "trop tôt" sont alors perdues et la question suivante reste bloquée
-// indéfiniment, avec pour conséquence un arrêt silencieux du programme
-// (aucune erreur : la Promise ne se résout juste jamais).
-// La file d'attente ci-dessous découple réception et consommation : une
-// ligne reçue avant d'être demandée est stockée ; une question posée
-// avant qu'une ligne soit disponible attend son tour. Ça fonctionne à
-// l'identique en terminal interactif et en entrée redirigée.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 let rl = null;
 const lineQueue = [];
@@ -970,12 +1094,12 @@ function closeReadline() {
   }
 }
 
-// Variante de askUser() qui masque la saisie à l'écran (affiche des "*"
-// au lieu des caractères tapés). Utilisée pour ne pas afficher une clé
-// API en clair dans le terminal. Repose sur une astuce classique de
-// readline (interception de l'écriture vers stdout) ; si l'environnement
-// ne le permet pas (ex: entrée non-TTY), on retombe simplement sur une
-// saisie visible plutôt que de faire planter l'agent.
+
+
+
+
+
+
 function askUserMasked(question) {
   const iface = getReadline();
   const originalWriteToOutput = iface._writeToOutput;
@@ -1076,7 +1200,7 @@ async function selectModel() {
 
   console.log(`\n✅ Fournisseur : ${provider.name}`);
 
-  // Récupération dynamique des modèles
+
   console.log("\n🔄 Récupération des modèles disponibles...");
 
   let models;
@@ -1096,7 +1220,7 @@ async function selectModel() {
 
   console.log(`\n✅ ${models.length} modèles récupérés.`);
 
-  // Recherche dans les modèles
+
   const search = await askUser(
     "\n🔎 Rechercher un modèle (Entrée = tous) : "
   );
@@ -1119,7 +1243,7 @@ async function selectModel() {
     return null;
   }
 
-  // Limiter l'affichage pour éviter 400 lignes
+
   const MAX_DISPLAYED_MODELS = 30;
 
   const displayedModels = filteredModels.slice(
@@ -1171,13 +1295,13 @@ async function selectModel() {
   };
 }
 
-// ==============================
-// PROVIDERS COMPATIBLES AVEC L'API "chat.completions"
-// ==============================
-// Chaque provider a sa propre implémentation dans runTask() :
-// openai/openrouter -> API "chat.completions" (SDK OpenAI)
-// anthropic          -> API "messages" (SDK Anthropic)
-// google             -> API "generateContent" (SDK GoogleGenAI, function calling)
+
+
+
+
+
+
+
 const SUPPORTED_TASK_PROVIDERS = ["openai", "openrouter", "anthropic", "google"];
 
 function assertProviderSupported(provider) {
@@ -1189,9 +1313,9 @@ function assertProviderSupported(provider) {
   }
 }
 
-// ==============================
-// COMMANDES LOCALES (jamais envoyées à l'IA)
-// ==============================
+
+
+
 
 function showHelp() {
   console.log("\n╭──────────────────────────────────────────────╮");
@@ -1218,12 +1342,12 @@ function showStatus(state) {
   console.log("╰──────────────────────────────────────────────╯");
 }
 
-// ==============================
-// GESTION DES CLÉS API (/keys)
-// ==============================
-// Permet d'ajouter, modifier et supprimer les clés API sans toucher au
-// fichier .env : les clés sont stockées dans le trousseau du système
-// d'exploitation via keyStore.js (module basé sur keytar).
+
+
+
+
+
+
 
 function confirmYes(answer) {
   return /^(o|oui|y|yes)$/i.test((answer || "").trim());
@@ -1373,9 +1497,9 @@ async function manageApiKeys() {
   }
 }
 
-// ==============================
-// PROMPT SYSTÈME (partagé entre tous les providers)
-// ==============================
+
+
+
 
 const AGENT_SYSTEM_PROMPT = `Tu es un agent de développement logiciel autonome. Ton objectif est de résoudre la demande de l'utilisateur de manière exacte, robuste et minimale.
 
@@ -1413,9 +1537,9 @@ RÈGLES DE CONCEPTION ET DE PATTERNS :
 - Évite le sur-engineering : ne complexifie jamais le code sans bénéfice réel.
 - Avant toute modification importante, identifie les conventions et l'architecture déjà présentes dans le projet afin de conserver leur cohérence.`;
 
-// ==============================
-// GESTION VISUELLE DE L'UI (Modern CLI style)
-// ==============================
+
+
+
 
 function formatToolLog(toolName, args, status = "running") {
   const icons = {
@@ -1439,7 +1563,7 @@ function formatToolLog(toolName, args, status = "running") {
   const icon = icons[toolName] || "🛠️";
   const label = labels[toolName] || toolName;
 
-  // Formatage propre : ✓  Label  File
+
   const file = args.filePath || args.command || args.directory || args.pattern;
 
   if (status === "success") {
@@ -1448,25 +1572,25 @@ function formatToolLog(toolName, args, status = "running") {
   return `  ${chalk.yellow("…")}  ${chalk.bold(label)}  ${file}`;
 }
 
-// ==============================
-// LIMITER LA TAILLE DE L'HISTORIQUE ENVOYÉ À L'API
-// ==============================
-// Sans ça, l'historique complet (y compris tous les résultats d'outils déjà
-// tronqués) est renvoyé intégralement à CHAQUE tour, ce qui fait grossir
-// le coût et la latence de chaque appel au fil des 20 tours max.
-// On garde toujours le tout premier message (contexte initial : system/user)
-// et seulement les N derniers tours pour ne pas perdre le fil trop tôt.
-// 🔴 CORRECTION : cette fonction était définie DEUX FOIS dans le fichier
-// d'origine (par caractères puis par tours "assistant" — la seconde
-// écrasait silencieusement la première). On garde la version par tours
-// "assistant", plus robuste (elle ne coupe jamais un couple
-// assistant/tool_result au milieu).
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function trimHistory(messages, keepLastNTurns = 8) {
-  // On repère les indices où commence chaque "tour" (un message role=assistant
-  // marque le début d'un nouveau tour, suivi de ses éventuels tool results).
-  // "assistant" (format OpenAI/Anthropic) ET "model" (format Gemini) marquent
-  // tous deux le début d'un nouveau tour.
+
+
+
+
   const turnStartIndices = messages
     .map((m, i) => (m.role === "assistant" || m.role === "model" ? i : null))
     .filter(i => i !== null);
@@ -1480,10 +1604,10 @@ function trimHistory(messages, keepLastNTurns = 8) {
   return [messages[0], ...messages.slice(cutoffIndex)];
 }
 
-// ==============================
-// EXÉCUTION D'UNE TÂCHE — VARIANTE OPENAI / OPENROUTER
-// (API "chat.completions", format OpenAI)
-// ==============================
+
+
+
+
 
 async function runTaskOpenAI(userRequest, client, modelName, state) {
   const messages = [
@@ -1506,10 +1630,10 @@ async function runTaskOpenAI(userRequest, client, modelName, state) {
     let response;
     sayThinking(true);
     try {
-      // 🔴 Historique borné pour ne pas renvoyer un contexte qui grossit sans fin
+
       const trimmedMessages = trimHistory(messages);
 
-      // 🔴 Appel encapsulé avec retry/backoff sur erreurs transitoires (429, 500, 503, timeouts réseau)
+
       response = await callWithRetry(() =>
         client.chat.completions.create({
           model: modelName,
@@ -1536,21 +1660,21 @@ async function runTaskOpenAI(userRequest, client, modelName, state) {
       );
     }
 
-    // Ajouter la réponse du modèle à l'historique
+
     messages.push(message);
 
-    // ==========================================
-    // LE MODÈLE NE DEMANDE PLUS D'OUTIL
-    // ==========================================
+
+
+
 
     if (!message.tool_calls?.length) {
       sayAssistant(message.content);
       break;
     }
 
-    // ==========================================
-    // LE MODÈLE DEMANDE UN OU PLUSIEURS OUTILS
-    // ==========================================
+
+
+
 
     for (const toolCall of message.tool_calls) {
 
@@ -1587,7 +1711,7 @@ async function runTaskOpenAI(userRequest, client, modelName, state) {
           }
         }
 
-        // Spinner uniquement pour run_command, qui peut prendre du temps
+
         let commandSpinner = null;
         if (toolName === "run_command") {
           commandSpinner = spin(`Exécution : ${args.command}`);
@@ -1624,22 +1748,22 @@ async function runTaskOpenAI(userRequest, client, modelName, state) {
     }
   }
 
-  // 🔴 AJOUT : si les 20 tours sont épuisés sans que le modèle n'ait rendu
-  // la main (dernier `if (!message.tool_calls?.length)` jamais atteint),
-  // la fonction retournait silencieusement — aucune ligne émise, donc rien
-  // affiché côté web : l'utilisateur voyait juste l'agent s'arrêter sans
-  // explication. "Limite de sécurité" est le texte que classifyMessage
-  // (app.js) reconnaît déjà comme ligne système — la règle existait mais
-  // rien ne l'émettait jamais.
+
+
+
+
+
+
+
   sayWarning("Votre agent a terminé son travail ou fait une pause");
 }
 
-// ==============================
-// CONVERSION DES OUTILS AU FORMAT ANTHROPIC
-// ==============================
-// Le format OpenAI est { type: "function", function: { name, description, parameters } }
-// Le format Anthropic est { name, description, input_schema }
-// On garde une seule source de vérité (le tableau `tools`) et on convertit.
+
+
+
+
+
+
 
 function toAnthropicTools(openaiTools) {
   return openaiTools.map(t => ({
@@ -1651,10 +1775,10 @@ function toAnthropicTools(openaiTools) {
 
 const anthropicTools = toAnthropicTools(tools);
 
-// ==============================
-// EXÉCUTION D'UNE TÂCHE — VARIANTE ANTHROPIC
-// (API "messages", format blocs de contenu)
-// ==============================
+
+
+
+
 
 async function runTaskAnthropic(userRequest, client, modelName, state) {
   let messages = [
@@ -1668,8 +1792,8 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
 
   for (let turn = 1; turn <= MAX_TURNS; turn++) {
 
-    // 🔴 Historique borné (comme pour OpenAI) : sans ça, l'historique complet
-    // grossit sans fin à chaque tour, jusqu'à dépasser la fenêtre de contexte.
+
+
     const trimmedMessages = trimHistory(messages);
 
     sayThinking(true);
@@ -1688,7 +1812,7 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
       sayThinking(false);
     }
 
-    // Ajouter la réponse à l'historique (format Anthropic natif)
+
     messages.push({
       role: "assistant",
       content: response.content
@@ -1698,9 +1822,9 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
       block => block.type === "tool_use"
     );
 
-    // ==========================================
-    // L'IA NE DEMANDE PLUS D'OUTIL
-    // ==========================================
+
+
+
 
     if (toolUseBlocks.length === 0) {
       const textBlocks = response.content
@@ -1712,9 +1836,9 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
       break;
     }
 
-    // ==========================================
-    // L'IA DEMANDE UN OU PLUSIEURS OUTILS
-    // ==========================================
+
+
+
 
     const toolResults = [];
 
@@ -1745,7 +1869,7 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
           }
         }
 
-        // Spinner uniquement pour run_command, qui peut prendre du temps
+
         let commandSpinner = null;
         if (toolName === "run_command") {
           commandSpinner = spin(`Exécution : ${args.command}`);
@@ -1788,17 +1912,17 @@ async function runTaskAnthropic(userRequest, client, modelName, state) {
     });
   }
 
-  // 🔴 AJOUT : voir le commentaire équivalent dans runTaskOpenAI.
+
   sayWarning("Limite de sécurité : nombre maximum de tours (20) atteint avant la fin de la tâche. Reformule une demande plus ciblée, ou relance pour continuer.");
 }
 
-// ==============================
-// CONVERSION DES OUTILS AU FORMAT GOOGLE (GEMINI)
-// ==============================
-// Le format OpenAI est { type: "function", function: { name, description, parameters } }
-// Le format Google (functionDeclarations) attend un schéma JSON dont les
-// "type" sont en MAJUSCULES (STRING, OBJECT, ARRAY, ...) au lieu de
-// "string"/"object"/"array" en minuscules.
+
+
+
+
+
+
+
 
 function toGoogleSchema(schema) {
   if (!schema || typeof schema !== "object") {
@@ -1848,10 +1972,10 @@ function toGoogleTools(openaiTools) {
 
 const googleTools = toGoogleTools(tools);
 
-// ==============================
-// EXÉCUTION D'UNE TÂCHE — VARIANTE GOOGLE GEMINI
-// (API "generateContent", function calling)
-// ==============================
+
+
+
+
 
 async function runTaskGoogle(userRequest, client, modelName, state) {
   let contents = [
@@ -1865,8 +1989,8 @@ async function runTaskGoogle(userRequest, client, modelName, state) {
 
   for (let turn = 1; turn <= MAX_TURNS; turn++) {
 
-    // 🔴 Historique borné (comme pour OpenAI) : sans ça, l'historique complet
-    // grossit sans fin à chaque tour, jusqu'à dépasser la fenêtre de contexte.
+
+
     const trimmedContents = trimHistory(contents);
 
     sayThinking(true);
@@ -1895,14 +2019,14 @@ async function runTaskGoogle(userRequest, client, modelName, state) {
       );
     }
 
-    // Ajouter la réponse du modèle à l'historique (format Google natif)
+
     contents.push(candidate.content);
 
     const functionCalls = response.functionCalls || [];
 
-    // ==========================================
-    // GEMINI NE DEMANDE PLUS D'OUTIL
-    // ==========================================
+
+
+
 
     if (functionCalls.length === 0) {
       const textBlocks = (candidate.content.parts || [])
@@ -1914,9 +2038,9 @@ async function runTaskGoogle(userRequest, client, modelName, state) {
       break;
     }
 
-    // ==========================================
-    // GEMINI DEMANDE UN OU PLUSIEURS OUTILS
-    // ==========================================
+
+
+
 
     const functionResponseParts = [];
 
@@ -1949,7 +2073,7 @@ async function runTaskGoogle(userRequest, client, modelName, state) {
           }
         }
 
-        // Spinner uniquement pour run_command, qui peut prendre du temps
+
         let commandSpinner = null;
         if (toolName === "run_command") {
           commandSpinner = spin(`Exécution : ${args.command}`);
@@ -1993,14 +2117,14 @@ async function runTaskGoogle(userRequest, client, modelName, state) {
     });
   }
 
-  // 🔴 AJOUT : voir le commentaire équivalent dans runTaskOpenAI.
+
   sayWarning("Limite de sécurité : nombre maximum de tours (20) atteint avant la fin de la tâche. Reformule une demande plus ciblée, ou relance pour continuer.");
 }
 
-// ==============================
-// DISPATCHER : choisit la bonne implémentation
-// selon le fournisseur actif
-// ==============================
+
+
+
+
 
 async function runTask(userRequest, provider, client, modelName, state) {
   switch (provider) {
@@ -2015,14 +2139,14 @@ async function runTask(userRequest, provider, client, modelName, state) {
       return await runTaskGoogle(userRequest, client, modelName, state);
 
     default:
-      // Ne devrait pas arriver : assertProviderSupported() bloque avant.
+
       throw new Error(`Fournisseur non supporté pour l'exécution : ${provider}`);
   }
 }
 
-// ==============================
-// SESSION INTERACTIVE
-// ==============================
+
+
+
 
 async function selectWorkspace() {
   console.log("\n──────────────────────────────────────────────╮");
@@ -2077,27 +2201,27 @@ async function selectWorkspace() {
 }
 
 async function main() {
-  // ==========================================
-  // 0. CHARGER LES CLÉS API STOCKÉES (trousseau système)
-  // ==========================================
-  // Les clés ajoutées via /keys sont stockées dans le trousseau du système
-  // (voir keyStore.js). On les injecte dans process.env avant tout, sans
-  // écraser une clé déjà définie dans .env.
+
+
+
+
+
+
   try {
     await keyStore.loadAllKeysIntoEnv();
   } catch (error) {
-    // Ne bloque jamais le démarrage : .env reste utilisable seul.
+
   }
 
-  // ==========================================
-  // 1. CHOIX DU DOSSIER DE TRAVAIL
-  // ==========================================
+
+
+
   if (WEB_MODE) {
-    // En mode web, pas de prompt bloquant à chaque démarrage/redémarrage :
-    // on reprend le dernier dossier connu (transmis par server.js via
-    // KHORGO_WORKSPACE, détecté depuis les logs précédents de l'agent),
-    // sinon le dossier courant. L'utilisateur peut toujours le changer
-    // explicitement via /workspace (bouton dédié côté navigateur).
+
+
+
+
+
     const envWorkspace = process.env.KHORGO_WORKSPACE;
 
     WORKSPACE =
@@ -2108,9 +2232,9 @@ async function main() {
     WORKSPACE = await selectWorkspace();
   }
 
-  // ==========================================
-  // 2. CHOIX DU FOURNISSEUR / MODÈLE PAR DÉFAUT
-  // ==========================================
+
+
+
   let selectedProvider = process.env.KHORGO_PROVIDER || "openrouter";
   let selectedModelId = process.env.KHORGO_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free";
 
@@ -2122,18 +2246,18 @@ async function main() {
     selectedModel = null;
   }
 
-  // Si le fournisseur par défaut n'est pas configuré (clé API manquante),
-  // on ne bloque pas l'utilisateur : on le laisse choisir un fournisseur
-  // disponible via le même flux que /model.
+
+
+
   if (!selectedModel) {
     if (WEB_MODE) {
-      // Le provider/modèle demandé (KHORGO_PROVIDER/KHORGO_MODEL, ou le
-      // défaut) n'a plus de clé configurée — typiquement parce que
-      // l'utilisateur vient de la supprimer via 🔑 Clés API. Plutôt que de
-      // mourir silencieusement (l'utilisateur ne le comprend que via un
-      // "agent terminé" opaque), on essaie de basculer automatiquement sur
-      // un autre provider qui a encore une clé, avec son premier modèle
-      // disponible.
+
+
+
+
+
+
+
       const fallbackProviders = getAvailableProviders();
 
       if (fallbackProviders.length > 0) {
@@ -2153,16 +2277,16 @@ async function main() {
             );
           }
         } catch (error) {
-          // Le fallback a échoué (ex: liste des modèles injoignable) —
-          // on retombe sur le message d'erreur ci-dessous.
+
+
           selectedModel = null;
         }
       }
 
       if (!selectedModel) {
-        // Préfixé ❌ (et non ⚠️) pour être reconnu comme une erreur par
-        // app.js (classifyMessage), et non affiché à tort comme une
-        // réponse de l'IA dans la bulle de chat.
+
+
+
         console.log("\n❌ Aucun modèle configuré. Choisis un fournisseur via le bouton 🧠 Modèle (ou ajoute une clé via 🔑 Clés API).");
         return;
       }
@@ -2215,15 +2339,15 @@ async function main() {
   let client = selectedModel.client;
   let modelName = selectedModel.model;
 
-  // État de session partagé avec les tâches (ex: mode auto-accept).
+
   const state = { autoAccept: false };
 
-  // ==========================================
-  // 3. GESTION PROPRE DE CTRL+C
-  // ==========================================
-  // Par défaut, Ctrl+C tue le process immédiatement, ce qui peut couper
-  // une écriture de fichier en plein milieu. On l'intercepte pour laisser
-  // l'utilisateur quitter proprement via /exit, ou confirmer une sortie forcée.
+
+
+
+
+
+
   let sigintCount = 0;
 
   const iface = getReadline();
@@ -2241,13 +2365,13 @@ async function main() {
     }
   });
 
-  // ==========================================
-  // 4. BANNIÈRE DE DÉMARRAGE
-  // ==========================================
-  // L'art ASCII n'a de sens qu'en terminal : en mode web, l'identité
-  // "Khorgo" est déjà affichée dans l'en-tête de la page, donc on ne
-  // l'envoie pas du tout (plutôt que de compter sur le client pour la
-  // filtrer après coup).
+
+
+
+
+
+
+
   if (!WEB_MODE) {
     console.log(chalk.bold.blue(`
  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -2265,9 +2389,9 @@ async function main() {
     console.log(`\n${chalk.dim("Type a prompt, or /help for commands.")}`);
   }
 
-  // Un seul événement structuré, envoyé une fois par démarrage/redémarrage :
-  // remplace 4 lignes de texte que le client devait re-parser (et qui
-  // s'affichaient à tort dans le fil de chat à chaque redémarrage).
+
+
+
   sayStatus({
     workspace: WORKSPACE,
     provider: selectedProvider,
@@ -2275,12 +2399,12 @@ async function main() {
     autoAccept: state.autoAccept
   });
 
-  // ==========================================
-  // 5. BOUCLE INTERACTIVE
-  // ==========================================
+
+
+
   try {
     while (true) {
-      // Prompt stylisé avec séparateur visuel
+
       const input = await askUser(
         `\n${chalk.dim("──────────────────────────────────────────────────────────────────")}\n` +
         `${chalk.blue.bold("❯")} `
@@ -2293,10 +2417,10 @@ async function main() {
         continue;
       }
 
-      // ==========================================
-      // COMMANDES LOCALES : traitées ici, jamais
-      // envoyées à l'IA.
-      // ==========================================
+
+
+
+
 
       if (trimmed.startsWith("/")) {
 
@@ -2375,9 +2499,9 @@ async function main() {
         continue;
       }
 
-      // ==========================================
-      // DEMANDE NORMALE : envoyée à l'IA
-      // ==========================================
+
+
+
 
       try {
         assertProviderSupported(selectedProvider);

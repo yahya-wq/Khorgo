@@ -4,9 +4,9 @@ const OpenAI = require("openai");
 const { GoogleGenAI } = require("@google/genai");
 const Anthropic = require("@anthropic-ai/sdk");
 
-// ==========================================
-// VÉRIFIER SI UNE CLÉ API EST DISPONIBLE
-// ==========================================
+
+
+
 
 function hasApiKey(provider) {
   const keys = {
@@ -24,12 +24,6 @@ function hasApiKey(provider) {
 
   return Boolean(process.env[envName]);
 }
-
-
-// ==========================================
-// FOURNISSEURS DISPONIBLES
-// ==========================================
-
 function getAvailableProviders() {
   const providers = [
     {
@@ -84,10 +78,10 @@ async function getOpenAIModels() {
 
   const response = await client.models.list();
 
-  // L'API OpenAI ne renvoie pas de "nom d'affichage" séparé,
-  // seulement un id (ex: "gpt-5", "whisper-1", "text-embedding-3-large").
-  // Tous les modèles du compte sont renvoyés, pas seulement ceux
-  // compatibles chat.completions.
+
+
+
+
   return response.data.map(model => ({
     id: model.id,
     name: model.id
@@ -103,16 +97,16 @@ async function getGoogleModels() {
     apiKey: process.env.GOOGLE_API_KEY
   });
 
-  // client.models.list() renvoie un "Pager" (itérable en pages),
-  // pas un tableau directement.
+
+
   const pager = await client.models.list();
   const models = [];
 
   for await (const model of pager) {
     models.push({
-      // Le SDK renvoie souvent un id du type "models/gemini-2.5-pro".
-      // On enlève le préfixe "models/" pour rester cohérent avec
-      // le format utilisé ailleurs (ex: models.js).
+
+
+
       id: (model.name || "").replace(/^models\//, ""),
       name: model.displayName || model.name
     });
@@ -160,17 +154,17 @@ async function getAvailableModels(provider) {
 }
 
 
-// ==========================================
-// CRÉER UN CLIENT
-// ==========================================
+
+
+
 
 function getModel(provider, model) {
 
   switch (provider) {
 
-    // =========================
-    // OPENAI
-    // =========================
+
+
+
 
     case "openai": {
 
@@ -188,12 +182,7 @@ function getModel(provider, model) {
         client
       };
     }
-
-
-    // =========================
-    // GOOGLE GEMINI
-    // =========================
-
+  
     case "google": {
 
       if (!hasApiKey("google")) {
@@ -210,12 +199,6 @@ function getModel(provider, model) {
         client
       };
     }
-
-
-    // =========================
-    // ANTHROPIC
-    // =========================
-
     case "anthropic": {
 
       if (!hasApiKey("anthropic")) {
@@ -232,12 +215,6 @@ function getModel(provider, model) {
         client
       };
     }
-
-
-    // =========================
-    // OPENROUTER
-    // =========================
-
     case "openrouter": {
 
       if (!hasApiKey("openrouter")) {
@@ -255,12 +232,6 @@ function getModel(provider, model) {
         client
       };
     }
-
-
-    // =========================
-    // FOURNISSEUR INCONNU
-    // =========================
-
     default:
       throw new Error(
         `Fournisseur inconnu : ${provider}`

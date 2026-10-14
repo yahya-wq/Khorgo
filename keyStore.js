@@ -1,20 +1,20 @@
 "use strict";
 
-// ==============================================================
-// keyStore.js
-// ==============================================================
-// Gère le stockage des clés API dans le trousseau du système
-// d'exploitation (Keychain sur macOS, Credential Manager sur
-// Windows, libsecret sur Linux) via le module "keytar", plutôt
-// que dans le fichier .env.
-//
-// API attendue par agent.js :
-//   - loadAllKeysIntoEnv()        -> injecte les clés stockées dans process.env
-//                                     (sans écraser une clé déjà définie via .env)
-//   - listConfiguredKeys()        -> renvoie le statut de chaque fournisseur
-//   - setKey(provider, apiKey)    -> enregistre/écrase une clé dans le trousseau
-//   - deleteKey(provider)         -> supprime une clé du trousseau
-// ==============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const keytar = require("keytar");
 const fs = require("fs");
@@ -22,16 +22,16 @@ const path = require("path");
 
 const SERVICE_NAME = "khorgo-agent";
 
-// Chemin du .env : le même que celui que dotenv.config() charge par défaut
-// (require("dotenv").config() dans modelManager.js, sans path explicite).
+
+
 const ENV_PATH = path.join(process.cwd(), ".env");
 
-// ==============================
-// FOURNISSEURS SUPPORTÉS
-// ==============================
-// Associe chaque fournisseur (utilisé par modelManager.js) à son label
-// affiché dans le menu /keys et à la variable d'environnement que les
-// SDK (OpenAI / Anthropic / Google) vont lire.
+
+
+
+
+
+
 const PROVIDERS = [
   { provider: "openai", label: "OpenAI", envVar: "OPENAI_API_KEY" },
   { provider: "openrouter", label: "OpenRouter", envVar: "OPENROUTER_API_KEY" },
@@ -49,9 +49,9 @@ function getProviderConfig(providerId) {
   return config;
 }
 
-// Mémorise, au chargement du module (donc avant toute injection depuis le
-// trousseau), quels fournisseurs avaient déjà une clé via .env / l'environnement.
-// Sert à distinguer la source (".env" vs "trousseau système") dans listConfiguredKeys().
+
+
+
 const envKeysAtStartup = new Set(
   PROVIDERS.filter(({ envVar }) => !!process.env[envVar]).map(p => p.provider)
 );
@@ -67,14 +67,14 @@ function maskKey(key) {
   return `${"•".repeat(hiddenLength)}${visible}`;
 }
 
-// ==============================
-// disableKeyInEnvFile
-// ==============================
-// Commente (plutôt que supprime, pour ne pas perdre la valeur) la ligne
-// "ENV_VAR=..." correspondante dans le fichier .env, si elle existe.
-// C'est ce qui manquait : sans ça, une clé venant de .env "revenait"
-// automatiquement à chaque redémarrage puisque dotenv la recharge.
-// Renvoie true si une ligne a effectivement été désactivée.
+
+
+
+
+
+
+
+
 function disableKeyInEnvFile(envVar) {
   if (!fs.existsSync(ENV_PATH)) {
     return false;
@@ -92,7 +92,7 @@ function disableKeyInEnvFile(envVar) {
   let modified = false;
 
   const newLines = lines.map(line => {
-    // Ne touche qu'aux lignes NON déjà commentées qui assignent cette variable.
+
     const match = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*)\s*=/);
 
     if (match && match[2] === envVar) {
@@ -110,19 +110,19 @@ function disableKeyInEnvFile(envVar) {
   try {
     fs.writeFileSync(ENV_PATH, newLines.join("\n"), "utf8");
   } catch (error) {
-    // Fichier .env non accessible en écriture (permissions, lecture seule...).
+
     return false;
   }
 
   return true;
 }
 
-// ==============================
-// loadAllKeysIntoEnv
-// ==============================
-// Appelée une fois au démarrage de l'agent. Injecte dans process.env
-// toutes les clés stockées dans le trousseau système, SANS écraser une
-// clé déjà présente (typiquement définie dans .env, qui garde priorité).
+
+
+
+
+
+
 async function loadAllKeysIntoEnv() {
   for (const { provider, envVar } of PROVIDERS) {
     if (process.env[envVar]) {
@@ -136,18 +136,18 @@ async function loadAllKeysIntoEnv() {
         process.env[envVar] = storedKey;
       }
     } catch (error) {
-      // Le trousseau système peut être indisponible (ex : pas de libsecret
-      // installé sur certaines distributions Linux minimales). On ignore
-      // silencieusement : .env reste utilisable seul dans ce cas.
+
+
+
     }
   }
 }
 
-// ==============================
-// listConfiguredKeys
-// ==============================
-// Renvoie, pour chaque fournisseur supporté, son statut de configuration :
-// { provider, label, envVar, configured, masked, source }
+
+
+
+
+
 async function listConfiguredKeys() {
   const statuses = [];
 
@@ -157,7 +157,7 @@ async function listConfiguredKeys() {
     let source = null;
 
     if (envKeysAtStartup.has(provider)) {
-      // Une clé était déjà présente via .env / l'environnement au démarrage.
+
       configured = true;
       masked = maskKey(process.env[envVar]);
       source = ".env";
@@ -171,8 +171,8 @@ async function listConfiguredKeys() {
           source = "trousseau système";
         }
       } catch (error) {
-        // Trousseau indisponible : la clé est simplement considérée comme
-        // non configurée plutôt que de faire planter le menu /keys.
+
+
       }
     }
 
@@ -182,11 +182,11 @@ async function listConfiguredKeys() {
   return statuses;
 }
 
-// ==============================
-// setKey
-// ==============================
-// Enregistre (ou écrase) la clé API d'un fournisseur dans le trousseau
-// système, et la rend immédiatement disponible dans la session en cours.
+
+
+
+
+
 async function setKey(providerId, apiKey) {
   const { envVar } = getProviderConfig(providerId);
 
@@ -196,9 +196,9 @@ async function setKey(providerId, apiKey) {
 
   const trimmedKey = apiKey.trim();
 
-  // On ne désactive la ligne .env (si elle existe) qu'une fois la nouvelle
-  // clé validée — jamais avant, pour ne pas casser une clé .env valide sur
-  // un appel invalide (clé vide, erreur d'appel, etc.).
+
+
+
   disableKeyInEnvFile(envVar);
 
   try {
@@ -212,13 +212,13 @@ async function setKey(providerId, apiKey) {
   process.env[envVar] = trimmedKey;
 }
 
-// ==============================
-// deleteKey
-// ==============================
-// Supprime la clé d'un fournisseur du trousseau système et de la session
-// en cours. Renvoie true si une clé a bien été supprimée DU TROUSSEAU
-// (utile pour distinguer le cas d'une clé venant uniquement de .env, qui
-// réapparaîtra au prochain démarrage tant que .env n'est pas modifié).
+
+
+
+
+
+
+
 async function deleteKey(providerId) {
   const { envVar } = getProviderConfig(providerId);
   disableKeyInEnvFile(envVar);
