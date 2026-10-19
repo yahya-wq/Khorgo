@@ -10,6 +10,8 @@
     "agent.js",
     "bin/khorgo.js",
     "keyStore.js",
+    "safePath.js",
+    "commandFilter.js",
     "modelManager.js",
     "server.js",
     "public/**/*"
@@ -20,8 +22,8 @@
   "scripts": {
     "start": "node bin/khorgo.js",
     "agent": "node agent.js",
-    "check": "node --check agent.js && node --check modelManager.js && node --check keyStore.js && node --check server.js",
-    "test": "npm run check",
+    "check": "node --check agent.js && node --check modelManager.js && node --check keyStore.js && node --check safePath.js && node --check commandFilter.js && node --check server.js",
+    "test": "npm run check && node tests/run-tests.js",
     "prepublishOnly": "npm run check"
   },
   "keywords": [

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const fs = require("fs");
+const { createSafePath } = require("./safePath");
+const { createCommandFilter } = require("./commandFilter");
 const path = require("path");
 const { execSync } = require("child_process");
 const readline = require("readline");
@@ -33,17 +35,6 @@ function spin(text) {
 
 
 
-const PROTECTED_FILES = new Set([
-  "agent.js",
-  "modelManager.js",
-  "models.js",
-  "keyStore.js",
-  ".env",
-  "package.json",
-  "package-lock.json",
-  "node_modules",
-  ".git"
-]);
 
 
 
@@ -233,113 +224,7 @@ function isInsideWorkspace(candidatePath) {
   return normalized === root || normalized.startsWith(root + path.sep);
 }
 
-function safePath(filePath) {
-
-  if (!filePath || typeof filePath !== "string") {
-    throw new Error("Chin de fichier invalide");
-  }
-
-
-  if (filePath.indexOf("\0") !== -1) {
-    throw new Error("Chemin invalide : caractère nul détecté");
-  }
-
-  const root = getResolvedWorkspace();
-  const absolutePath = path.resolve(root, filePath);
-
-
-
-
-  let existingAncestor = absolutePath;
-  let remainder = "";
-
-
-  const MAX_DEPTH = 1024;
-  let depth = 0;
-
-  while (!fs.existsSync(existingAncestor)) {
-    const parent = path.dirname(existingAncestor);
-
-    if (parent === existingAncestor || depth++ > MAX_DEPTH) {
-
-      break;
-    }
-
-    remainder = path.join(path.basename(existingAncestor), remainder);
-    existingAncestor = parent;
-  }
-
-
-
-
-  let resolvedAncestor;
-  try {
-    resolvedAncestor = fs.realpathSync(existingAncestor);
-  } catch (error) {
-
-    throw new Error(
-      `Impossible de résoudre le chemin : ${existingAncestor} (${error.message})`
-    );
-  }
-
-
-  const fullPath = remainder
-    ? path.join(resolvedAncestor, remainder)
-    : resolvedAncestor;
-
-
-
-
-  if (!isInsideWorkspace(fullPath)) {
-    throw new Error(
-      `Accès refusé hors de l'espace de travail : ${filePath}`
-    );
-  }
-
-
-
-
-
-
-
-  try {
-    const lstat = fs.lstatSync(fullPath);
-
-    if (lstat.isSymbolicLink()) {
-
-      const linkTarget = fs.realpathSync(fullPath);
-
-      if (!isInsideWorkspace(linkTarget)) {
-        throw new Error(
-          `Accès refusé : '${filePath}' est un symlink pointant hors de l'espace de travail`
-        );
-      }
-    }
-  } catch (error) {
-
-    if (error.message.startsWith("Accès refusé")) {
-      throw error;
-    }
-
-
-  }
-
-
-
-
-  const relativePath = path.relative(root, normalizeForComparison(fullPath));
-  const topLevelEntity = relativePath.split(path.sep)[0].toLowerCase();
-
-  const protectedLower = new Set([...PROTECTED_FILES].map(f => f.toLowerCase()));
-
-  if (protectedLower.has(topLevelEntity)) {
-    throw new Error(
-      `Accès refusé : '${topLevelEntity}' fait partie de mon code source interne.`
-    );
-  }
-
-  return fullPath;
-}
+const safePath = createSafePath(getResolvedWorkspace);
 
 
 function isWithinWorkspace(fullPath) {
@@ -609,122 +494,10 @@ function formatSearchResults(pattern, matches) {
 
 
 
-const ALLOWED_BASE_COMMANDS = [
-  "node",
-  "npm",
-  "npx",
-  "python",
-  "python3",
-  "pip",
-  "git",
-  "dir",
-  "ls",
-  "cd",
-  "mkdir",
-  "touch"
-];
-
-const BLOCKED_COMMAND_PATTERNS = [
-  /rm\s+(-\w*r\w*f\w*|-\w*f\w*r\w*)\s+(\/|~|\.{1,2}(\/|$)|\*)/i,
-  /format\b/i,
-  /shutdown\b/i,
-  /sudo\b/i,
-  /runas\b/i,
-  /invoke-expression|iex\b/i,
-  />\s*\/dev\/(sd|null)/i,
-  /curl.*\|\s*(sh|bash)/i,
-  /wget.*\|\s*(sh|bash)/i
-];
-
-
-const COMMAND_SUBSTITUTION = /`|\$\(/;
-
-
-
-
-
-
-
-
-
-
-const INLINE_EVAL_FLAGS = {
-  node: [/^-e$/, /^--eval$/, /^-p$/, /^--print$/],
-  python: [/^-c$/],
-  python3: [/^-c$/]
-};
-
-function assertNoInlineEval(baseCommand, argTokens) {
-  const flags = INLINE_EVAL_FLAGS[baseCommand];
-  if (!flags) return;
-
-  const hasEvalFlag = argTokens.some(token => flags.some(re => re.test(token)));
-
-  if (hasEvalFlag) {
-    throw new Error(
-      `Commande refusée : l'exécution de code inline ("${baseCommand} -e/-c/--eval/-p") est bloquée ` +
-      `car elle contourne le bac à sable du workspace (safePath) et l'accès aux fichiers protégés. ` +
-      `Écris le code dans un fichier via write_file, puis exécute-le avec run_command ` +
-      `(ex: "${baseCommand} script.js" / "${baseCommand} script.py").`
-    );
-  }
-}
-
-function assertSegmentAllowed(segment) {
-  const trimmed = segment.trim();
-  if (!trimmed) return;
-
-  for (const blocked of BLOCKED_COMMAND_PATTERNS) {
-    if (blocked.test(trimmed)) {
-      throw new Error(`Commande refusée : motif interdit détecté (${blocked}) dans "${trimmed}".`);
-    }
-  }
-
-  const tokens = trimmed.split(/\s+/);
-  const baseCommand = tokens[0].toLowerCase();
-
-  if (!ALLOWED_BASE_COMMANDS.includes(baseCommand)) {
-    throw new Error(
-      `Commande refusée : "${baseCommand}" n'est pas une commande autorisée. ` +
-      `Commandes permises : ${ALLOWED_BASE_COMMANDS.join(", ")}.`
-    );
-  }
-
-  assertNoInlineEval(baseCommand, tokens.slice(1));
-}
-
-function assertCommandAllowed(command) {
-  const trimmed = command.trim();
-
-  if (!trimmed) {
-    throw new Error("Commande vide.");
-  }
-
-  if (COMMAND_SUBSTITUTION.test(trimmed)) {
-    throw new Error(
-      `Commande refusée : la substitution de commande (backticks ou $(...)) n'est pas autorisée.`
-    );
-  }
-
-
-
-
-  const segments = trimmed.split(/&&|\|\||;|\||&/);
-
-  for (const segment of segments) {
-    assertSegmentAllowed(segment);
-  }
-}
-
-
-
-
-
-
-
-
-
-
+// Filtre des commandes (voir commandFilter.js). Les chemins (arguments,
+// redirections, cd/mkdir/touch) sont validés avec le même safePath que les
+// outils de fichiers.
+const { assertCommandAllowed } = createCommandFilter({ safePath });
 
 function runCommand(command) {
   assertCommandAllowed(command);

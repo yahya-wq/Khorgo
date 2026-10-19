@@ -14,7 +14,8 @@ console.log('─'.repeat(50));
 try {
   // Exécuter tous les tests
   const testFiles = [
-    'tests/safePath.test.js'
+    'tests/safePath.test.js',
+    'tests/commandFilter.test.js'
   ];
 
   for (const testFile of testFiles) {

@@ -13,106 +13,19 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-// Créer un workspace temporaire pour les tests
-const TEST_WORKSPACE = fs.mkdtempSync(path.join(os.tmpdir(), 'khorgo-test-'));
+// On teste le VRAI safePath (safePath.js), plus une copie.
+const { createSafePath } = require('../safePath');
 
-// Sauvegarder le WORKSPACE original et le remplacer
-let originalWorkspace;
-
-// Importer agent.js après avoir configuré le workspace
-function loadAgent() {
-  // Supprimer le cache pour recharger avec le nouveau WORKSPACE
-  delete require.cache[require.resolve('../agent.js')];
-
-  // Mock du WORKSPACE avant le chargement
-  const agentPath = require.resolve('../agent.js');
-  const agentCode = fs.readFileSync(agentPath, 'utf8');
-
-  // Créer un module wrapper qui définit WORKSPACE avant de charger agent.js
-  const Module = require('module');
-  const originalRequire = Module.prototype.require;
-
-  Module.prototype.require = function(id) {
-    if (id === '../agent.js' || id === './agent.js') {
-      // Intercepter le chargement pour définir WORKSPACE
-      const result = originalRequire.apply(this, arguments);
-      return result;
-    }
-    return originalRequire.apply(this, arguments);
-  };
-
-  // Charger agent.js
-  const agent = require('../agent.js');
-
-  // Restaurer le require original
-  Module.prototype.require = originalRequire;
-
-  return agent;
-}
-
-// Fonction safePath() extraite pour les tests (version simplifiée)
+// Un seul guard par workspace, comme dans agent.js (le cache de la racine
+// vit dans le guard : le recréer à chaque appel fausserait les mesures).
+const guards = new Map();
 function safePath(filePath, workspace) {
-  if (!filePath || typeof filePath !== 'string') {
-    throw new Error('Chemin de fichier invalide');
+  let guard = guards.get(workspace);
+  if (!guard) {
+    guard = createSafePath(() => workspace);
+    guards.set(workspace, guard);
   }
-
-  if (filePath.indexOf('\0') !== -1) {
-    throw new Error('Chemin invalide : caractère nul détecté');
-  }
-
-  const absolutePath = path.resolve(workspace, filePath);
-
-  let existingAncestor = absolutePath;
-  let remainder = '';
-
-  const MAX_DEPTH = 1024;
-  let depth = 0;
-
-  while (!fs.existsSync(existingAncestor)) {
-    const parent = path.dirname(existingAncestor);
-    if (parent === existingAncestor || depth++ > MAX_DEPTH) break;
-    remainder = path.join(path.basename(existingAncestor), remainder);
-    existingAncestor = parent;
-  }
-
-  let resolvedAncestor;
-  try {
-    resolvedAncestor = fs.realpathSync(existingAncestor);
-  } catch (error) {
-    throw new Error(`Impossible de résoudre le chemin : ${existingAncestor} (${error.message})`);
-  }
-
-  const fullPath = remainder ? path.join(resolvedAncestor, remainder) : resolvedAncestor;
-
-  // Vérifier que le chemin est dans le workspace
-  const resolvedWorkspace = fs.realpathSync(workspace);
-  if (fullPath !== resolvedWorkspace && !fullPath.startsWith(resolvedWorkspace + path.sep)) {
-    throw new Error(`Accès refusé hors de l'espace de travail : ${filePath}`);
-  }
-
-  // Vérifier les fichiers protégés
-  const PROTECTED_FILES = new Set([
-    'agent.js',
-    'modelManager.js',
-    'models.js',
-    'keyStore.js',
-    '.env',
-    'package.json',
-    'package-lock.json',
-    'node_modules',
-    '.git'
-  ]);
-
-  const relativePath = path.relative(resolvedWorkspace, fullPath);
-  const topLevelEntity = relativePath.split(path.sep)[0].toLowerCase();
-
-  const protectedLower = new Set([...PROTECTED_FILES].map(f => f.toLowerCase()));
-
-  if (protectedLower.has(topLevelEntity)) {
-    throw new Error(`Accès refusé : '${topLevelEntity}' fait partie de mon code source interne.`);
-  }
-
-  return fullPath;
+  return guard(filePath);
 }
 
 describe('safePath() - Tests de sécurité', () => {
@@ -244,14 +157,21 @@ describe('safePath() - Tests de sécurité', () => {
       );
     });
 
-    it('devrait bloquer l\'accès via un sous-dossier', () => {
+    it('devrait autoriser un fichier nommé agent.js dans un sous-dossier (fichier utilisateur)', () => {
       fs.mkdirSync(path.join(testWorkspace, 'subdir2'), { recursive: true });
       fs.writeFileSync(path.join(testWorkspace, 'subdir2', 'agent.js'), 'test');
 
-      assert.throws(
-        () => safePath('subdir2/agent.js', testWorkspace),
-        /fait partie de mon code source interne/
-      );
+      assert.doesNotThrow(() => safePath('subdir2/agent.js', testWorkspace));
+    });
+
+    it('devrait bloquer .env et .git à toute profondeur', () => {
+      fs.mkdirSync(path.join(testWorkspace, 'pkg', '.git', 'hooks'), { recursive: true });
+      fs.writeFileSync(path.join(testWorkspace, 'pkg', '.env'), 'SECRET=1');
+
+      assert.throws(() => safePath('pkg/.env', testWorkspace), /code source interne/);
+      assert.throws(() => safePath('pkg/.env.local', testWorkspace), /code source interne/);
+      assert.throws(() => safePath('pkg/.git/hooks/pre-commit', testWorkspace), /code source interne/);
+      assert.throws(() => safePath('pkg/node_modules/x/index.js', testWorkspace), /code source interne/);
     });
   });
 
@@ -316,6 +236,19 @@ describe('safePath() - Tests de sécurité', () => {
           fs.unlinkSync(externalFile);
         } catch {}
       }
+    });
+
+    it('devrait bloquer un symlink dangling pointant hors du workspace', function() {
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'khorgo-outside-'));
+      const link = path.join(testWorkspace, 'dangling-link');
+      try {
+        fs.symlinkSync(path.join(outside, 'nouveau-fichier'), link);
+      } catch (e) {
+        return this.skip ? this.skip() : undefined; // symlinks indisponibles (Windows sans droits)
+      }
+      // La cible n'existe pas encore : écrire via ce lien créerait un fichier hors workspace.
+      assert.throws(() => safePath('dangling-link', testWorkspace));
+      fs.unlinkSync(link);
     });
 
     it('devrait accepter un symlink pointant dans le workspace', () => {
@@ -417,6 +350,11 @@ describe('safePath() - Tests de sécurité', () => {
   });
 });
 
+// 100 ms / 1000 appels sous Linux/macOS. Windows : realpathSync est bien plus
+// lent (antivirus, chemins 8.3) ; le seuil sert juste à détecter une régression
+// grossière, pas à mesurer la vitesse (safePath est appelé une fois par outil).
+const LIMIT_MS = process.platform === 'win32' ? 10000 : 100;
+
 describe('safePath() - Performance', () => {
   let testWorkspace;
 
@@ -439,8 +377,7 @@ describe('safePath() - Performance', () => {
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
 
-    // 1000 appels doivent prendre moins de 100ms
-    assert.ok(durationMs < 100, `Performance insuffisante : ${durationMs}ms pour 1000 appels`);
+        assert.ok(durationMs < LIMIT_MS, `Performance insuffisante : ${durationMs}ms pour 1000 appels (limite ${LIMIT_MS}ms)`);
   });
 
   it('devrait être rapide pour les chemins bloqués', () => {
@@ -455,8 +392,7 @@ describe('safePath() - Performance', () => {
     const end = process.hrtime.bigint();
     const durationMs = Number(end - start) / 1_000_000;
 
-    // 1000 rejets doivent prendre moins de 100ms
-    assert.ok(durationMs < 100, `Performance insuffisante : ${durationMs}ms pour 1000 rejets`);
+        assert.ok(durationMs < LIMIT_MS, `Performance insuffisante : ${durationMs}ms pour 1000 rejets (limite ${LIMIT_MS}ms)`);
   });
 });
 
